@@ -1,0 +1,13 @@
+services:
+  helden-training:
+    build: ./helden_training
+    ports:
+      - "127.0.0.1:8099:8099"
+    environment:
+      INGRESS_ONLY: "false"
+      DATA_DIR: /data
+    volumes:
+      - training-data:/data
+    restart: unless-stopped
+volumes:
+  training-data:

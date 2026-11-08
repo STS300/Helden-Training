@@ -1,0 +1,42 @@
+name: Checks
+on:
+  push:
+    branches: [main]
+  pull_request:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: helden_training/frontend/package-lock.json
+      - run: pip install -r requirements-dev.txt
+      - run: python -m pytest -q
+      - run: npm ci && npm run build
+        working-directory: helden_training/frontend
+      - run: npx playwright install --with-deps chromium
+        working-directory: helden_training/frontend
+      - run: npm run test:e2e
+        working-directory: helden_training/frontend
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: browser-test-results
+          path: helden_training/frontend/test-results
+  container:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: helden_training
+          platforms: linux/amd64,linux/arm64
+          push: false
