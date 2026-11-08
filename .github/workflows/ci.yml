@@ -3,6 +3,11 @@ on:
   push:
     branches: [main]
   pull_request:
+permissions:
+  contents: read
+concurrency:
+  group: checks-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -18,7 +23,7 @@ jobs:
           cache-dependency-path: helden_training/frontend/package-lock.json
       - run: pip install -r requirements-dev.txt
       - run: python -m pytest -q
-      - run: npm ci && npm run build
+      - run: npm ci && npm run format:check && npm run build
         working-directory: helden_training/frontend
       - run: npx playwright install --with-deps chromium
         working-directory: helden_training/frontend
