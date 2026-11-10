@@ -29,7 +29,15 @@ export async function upload(
   return new Promise<void>((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open("PUT", url(`api/exercises/${id}/video`));
-    xhr.setRequestHeader("Content-Type", "video/mp4");
+    // iOS file pickers sometimes provide an empty MIME type. Keep MOV intact.
+    const extension = file.name.toLowerCase().split(".").pop();
+    const mediaType =
+      extension === "mov"
+        ? "video/quicktime"
+        : extension === "mp4"
+          ? "video/mp4"
+          : file.type || "application/octet-stream";
+    xhr.setRequestHeader("Content-Type", mediaType);
     xhr.setRequestHeader("X-Helden-Request", "1");
     xhr.upload.onprogress = (e) => {
       if (e.lengthComputable)

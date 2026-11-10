@@ -135,7 +135,7 @@ function VideoPlayer({ path, exercise }: { path: string; exercise: Exercise }) {
       onError={(e) => {
         e.currentTarget.insertAdjacentText(
           "afterend",
-          " Video nicht abspielbar. Bitte MP4 mit H.264/AAC verwenden.",
+          " Video hochgeladen, aber auf diesem Gerät nicht abspielbar. Bei HEVC/ProRes bitte eine H.264/AAC-Version verwenden.",
         );
       }}
     />
@@ -1157,13 +1157,17 @@ function ExerciseEditor({
                 ? "Video ersetzen (optional)"
                 : "Eigenes Video hinzufügen (optional)")}
           </strong>
-          <span>MP4 mit H.264/AAC · maximal 512 MB</span>
+          <span>MP4 oder MOV (iPhone) · maximal 512 MB</span>
           <input
             type="file"
-            accept="video/mp4,.mp4"
+            accept="video/mp4,video/quicktime,video/x-quicktime,.mp4,.mov"
             onChange={(e) => setFile(e.target.files?.[0] || null)}
           />
         </label>
+        <p className="muted">
+          MOV-Dateien werden unverändert gespeichert. Die Wiedergabe von
+          HEVC/ProRes hängt vom Gerät und Browser ab.
+        </p>
         <div className="form-grid">
           <label>
             Video-Start (Sekunden)

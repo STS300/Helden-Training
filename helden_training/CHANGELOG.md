@@ -1,3 +1,9 @@
+# 0.1.1
+
+- MOV-Uploads vom iPhone zusätzlich zu MP4 unterstützen, auch ohne MIME-Angabe im Dateidialog.
+- QuickTime-Container als MOV speichern und mit korrektem Medientyp in Bibliothek und Sessions ausliefern.
+- Hinweise zur geräteabhängigen HEVC-/ProRes-Wiedergabe ergänzen. Keine automatische Videokonvertierung.
+
 # 0.1.0
 
 - Deutsche, responsive Trainingsoberfläche mit Home-Assistant-Ingress.

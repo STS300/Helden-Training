@@ -7,7 +7,7 @@ Eine lokale Krafttrainings-App für **Home Assistant OS**. Eigene Übungsvideos,
 ## Funktionen der ersten Version
 
 - Profile anlegen, umbenennen, farblich kennzeichnen und archivieren.
-- Eigene MP4-Videos hochladen, ersetzen und mit Start-/Endzeit versehen.
+- Eigene MP4- und MOV-Videos hochladen, ersetzen und mit Start-/Endzeit versehen.
 - Übungen nach **Ganzer Körper, Oberkörper, Unterkörper, Beine, Push und Pull** kategorisieren, durchsuchen und bearbeiten.
 - Pläne mit Übungsreihenfolge, Sätzen, Wiederholungen, Zielgewicht und Satzpausen erstellen, bearbeiten und duplizieren.
 - Jeden Satz mit Gewicht, Wiederholungen und optionaler Notiz sofort speichern.
@@ -94,11 +94,11 @@ Die Browserprüfungen starten einen isolierten Server mit temporärer Datenbank 
 
 Alle Daten und Videos liegen im persistenten App-Verzeichnis `/data`. Die App fordert ein kaltes HA-Backup an. Sie muss in die Home-Assistant-Sicherung aufgenommen werden. Auch bei manuellen Sicherungen die App stoppen und das **gesamte** Datenverzeichnis kopieren. Der JSON-Export enthält keine Videodateien und besitzt noch keine Importfunktion.
 
-Profile trennen Trainingswerte, aber keine Zugriffsrechte: Personen mit App-Zugang können alle Profile verwalten. Videos werden nicht transkodiert; empfohlen sind MP4/H.264/AAC, bis 512 MB je Datei. Ersetzte Videos bleiben für frühere Sessions erhalten. Kein Offline-Schreiben und keine garantierten Hintergrundalarme am Smartphone.
+Profile trennen Trainingswerte, aber keine Zugriffsrechte: Personen mit App-Zugang können alle Profile verwalten. Videos werden nicht transkodiert; empfohlen sind MP4 oder MOV, bis 512 MB je Datei; H.264/AAC wird für die Wiedergabe empfohlen. HEVC/ProRes benötigt einen kompatiblen Browser und ein kompatibles Gerät. Ersetzte Videos bleiben für frühere Sessions erhalten. Kein Offline-Schreiben und keine garantierten Hintergrundalarme am Smartphone.
 
 ## Weitere Ausbaustufen
 
-Diese Funktionen sind noch nicht Teil von 0.1.0:
+Diese Funktionen sind noch nicht Teil von 0.1.1:
 
 - MQTT-Anbindung für Licht, Lüfter, Musik und Trainingsereignisse.
 - Wochenkalender und Trainingsvorschläge nach Zeit und Geräten.

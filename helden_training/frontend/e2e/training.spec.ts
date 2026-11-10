@@ -92,30 +92,41 @@ test("complete training flow through an Ingress prefix", async ({
   expect(errors).toEqual([]);
 });
 
-test("MP4 upload and relative video URL", async ({ page }, testInfo) => {
-  await page.goto("/api/hassio_ingress/test-token/");
-  await page.getByRole("button", { name: "Übungsbibliothek" }).click();
-  await page.getByRole("button", { name: "Übung hinzufügen" }).click();
-  await page.getByLabel("Übungsname").fill(`Video ${testInfo.project.name}`);
-  await page.locator("input[type=file]").setInputFiles({
-    name: "test.mp4",
-    mimeType: "video/mp4",
-    buffer: Buffer.from(
-      "000000186674797069736f6d0000000069736f6d6d703432",
-      "hex",
-    ),
+for (const format of ["mp4", "mov"] as const) {
+  test(`${format.toUpperCase()} upload and relative video URL`, async ({
+    page,
+  }, testInfo) => {
+    await page.goto("/api/hassio_ingress/test-token/");
+    await page.getByRole("button", { name: "Übungsbibliothek" }).click();
+    await page.getByRole("button", { name: "Übung hinzufügen" }).click();
+    await page
+      .getByLabel("Übungsname")
+      .fill(`Video ${format} ${testInfo.project.name}`);
+    await page.locator("input[type=file]").setInputFiles({
+      name: `test.${format.toUpperCase()}`,
+      mimeType: format === "mov" ? "" : "video/mp4",
+      buffer: Buffer.from(
+        format === "mov"
+          ? "000000186674797071742020000000007174202000000000"
+          : "000000186674797069736f6d0000000069736f6d6d703432",
+        "hex",
+      ),
+    });
+    await page.getByRole("button", { name: "Übung speichern" }).click();
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await page
+      .getByRole("button", {
+        name: `Video ${format} ${testInfo.project.name} ansehen`,
+        exact: true,
+      })
+      .click();
+    const source = await page.locator("video").getAttribute("src");
+    expect(source).toContain("/api/hassio_ingress/test-token/api/exercises/");
+    const result = await page.request.get(source!);
+    expect(result.status()).toBe(200);
+    expect(result.headers()["content-type"]).toBe(
+      format === "mov" ? "video/quicktime" : "video/mp4",
+    );
+    // Container fixture only. Playback codec validation is a separate manual check.
   });
-  await page.getByRole("button", { name: "Übung speichern" }).click();
-  await expect(page.getByRole("dialog")).toHaveCount(0);
-  await page
-    .getByRole("button", {
-      name: `Video ${testInfo.project.name} ansehen`,
-      exact: true,
-    })
-    .click();
-  const source = await page.locator("video").getAttribute("src");
-  expect(source).toContain("/api/hassio_ingress/test-token/api/exercises/");
-  const result = await page.request.get(source!);
-  expect(result.status()).toBe(200);
-  // Container fixture only. Playback codec validation is a separate manual check.
-});
+}

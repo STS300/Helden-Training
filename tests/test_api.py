@@ -168,3 +168,33 @@ def test_archived_exercise_plan_start_rolls_back(client):
     client.delete(f"/api/exercises/{exercise['id']}")
     assert client.post('/api/sessions', json={'profile_id': profile['id'], 'plan_id': plan['id']}).status_code == 404
     assert client.get(f"/api/sessions?profile_id={profile['id']}").json() == []
+
+
+@pytest.mark.parametrize('content_type', ['video/quicktime', 'video/x-quicktime', 'application/octet-stream'])
+def test_iphone_mov_upload_playback_and_session_snapshot(client, content_type):
+    profile, exercise, plan = setup_training(client)
+    mov = b'\x00\x00\x00\x18ftypqt  \x00\x00\x00\x00qt  \x00\x00\x00\x00'
+    path = f"/api/exercises/{exercise['id']}/video"
+    result = client.put(path, content=mov, headers={'Content-Type': content_type})
+    assert result.status_code == 200
+    assert client.get(path).headers['content-type'] == 'video/quicktime'
+    assert client.get(path).content == mov
+    session = start(client, profile, plan)
+    client.put(path, content=MP4, headers={'Content-Type': 'video/mp4'})
+    assert client.get(path).headers['content-type'] == 'video/mp4'
+    video_path = f"/api/sessions/{session['id']}/items/{session['items'][0]['id']}/video"
+    result = client.get(video_path, headers={'Range': 'bytes=0-7'})
+    assert result.status_code == 206
+    assert result.headers['content-type'] == 'video/quicktime'
+    assert result.content == mov[:8]
+
+
+def test_legacy_quicktime_without_ftyp(client):
+    _, exercise, _ = setup_training(client)
+    path = f"/api/exercises/{exercise['id']}/video"
+    mov = b'\x00\x00\x00\x10mdat' + b'\x00' * 8
+    assert client.put(path, content=mov, headers={'Content-Type': 'video/quicktime'}).status_code == 200
+    assert client.get(path).headers['content-type'] == 'video/quicktime'
+    invalid = b'\x00\x00\xff\xffmdat' + b'\x00' * 8
+    assert client.put(path, content=invalid, headers={'Content-Type': 'video/quicktime'}).status_code == 415
+    assert client.get(path).content == mov

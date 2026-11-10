@@ -140,7 +140,7 @@ def create_app(data_dir=None, static_dir=None, ingress_only=None):
             partial.unlink(missing_ok=True)
         yield
 
-    app = FastAPI(title='Helden-Training', version='0.1.0', lifespan=lifespan,
+    app = FastAPI(title='Helden-Training', version='0.1.1', lifespan=lifespan,
                   docs_url=None, redoc_url=None, openapi_url=None)
 
     @app.exception_handler(RequestValidationError)
@@ -211,7 +211,7 @@ def create_app(data_dir=None, static_dir=None, ingress_only=None):
 
     @app.get('/api/health')
     def health():
-        return {'status': 'ok', 'version': '0.1.0'}
+        return {'status': 'ok', 'version': '0.1.1'}
 
     @app.get('/api/categories')
     def categories():
@@ -284,8 +284,9 @@ def create_app(data_dir=None, static_dir=None, ingress_only=None):
     async def upload_video(identifier: int, request: Request):
         with db() as conn:
             get(conn, 'exercises', identifier, True)
-        if request.headers.get('content-type', '').split(';')[0] not in ('video/mp4', 'application/octet-stream'):
-            raise HTTPException(415, 'Bitte eine MP4-Datei hochladen.')
+        content_type = request.headers.get('content-type', '').split(';')[0].strip().lower()
+        if content_type not in ('video/mp4', 'video/quicktime', 'video/x-quicktime', 'application/octet-stream'):
+            raise HTTPException(415, 'Bitte eine MP4- oder MOV-Datei hochladen.')
         if int(request.headers.get('content-length') or 0) > max_upload:
             raise HTTPException(413, 'Video überschreitet das Uploadlimit.')
         filename = uuid.uuid4().hex + '.mp4'
@@ -302,8 +303,15 @@ def create_app(data_dir=None, static_dir=None, ingress_only=None):
                     if len(header) < 32:
                         header.extend(chunk[:32 - len(header)])
                     target.write(chunk)
-            if size < 12 or header[4:8] != b'ftyp':
-                raise HTTPException(415, 'Die Datei ist kein unterstützter MP4-Container.')
+            modern_container = size >= 12 and header[4:8] == b'ftyp'
+            # Older QuickTime files may begin directly with an atom, without ftyp.
+            legacy_mov = (size >= 8 and header[4:8] in (b'moov', b'mdat', b'wide', b'free')
+                          and 8 <= int.from_bytes(header[:4], 'big') <= size)
+            if not modern_container and not legacy_mov:
+                raise HTTPException(415, 'Die Datei ist kein unterstützter MP4-/MOV-Container.')
+            is_mov = legacy_mov or header[8:12] == b'qt  ' or content_type in ('video/quicktime', 'video/x-quicktime')
+            filename = final.stem + ('.mov' if is_mov else '.mp4')
+            final = data / 'videos' / filename
             partial.rename(final)
             with db() as conn:
                 # Recheck after streaming: the exercise might have been archived meanwhile.
@@ -322,7 +330,7 @@ def create_app(data_dir=None, static_dir=None, ingress_only=None):
             exercise = get(conn, 'exercises', identifier)
         if not exercise['video'] or not (data / 'videos' / exercise['video']).is_file():
             raise HTTPException(404, 'Kein Video vorhanden.')
-        return FileResponse(data / 'videos' / exercise['video'], media_type='video/mp4')
+        return FileResponse(data / 'videos' / exercise['video'], media_type='video/quicktime' if Path(exercise['video']).suffix == '.mov' else 'video/mp4')
 
     @app.get('/api/sessions/{session_id}/items/{item_id}/video')
     def session_video(session_id: int, item_id: int):
@@ -333,7 +341,7 @@ def create_app(data_dir=None, static_dir=None, ingress_only=None):
         filename = json.loads(item['snapshot']).get('video')
         if not filename or not (data / 'videos' / filename).is_file():
             raise HTTPException(404, 'Kein Video vorhanden.')
-        return FileResponse(data / 'videos' / filename, media_type='video/mp4')
+        return FileResponse(data / 'videos' / filename, media_type='video/quicktime' if Path(filename).suffix == '.mov' else 'video/mp4')
 
     def plan_detail(conn, identifier):
         plan = get(conn, 'plans', identifier)

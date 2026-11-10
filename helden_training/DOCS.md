@@ -4,7 +4,7 @@
 
 1. App installieren und starten. „In Seitenleiste anzeigen“ einschalten.
 2. Weboberfläche öffnen und ein Trainingsprofil anlegen.
-3. Unter **Übungsbibliothek → Übung hinzufügen** Name, Kategorien und optional ein eigenes MP4-Video anlegen.
+3. Unter **Übungsbibliothek → Übung hinzufügen** Name, Kategorien und optional ein eigenes MP4- oder MOV-Video anlegen.
 4. Unter **Trainingspläne → Plan erstellen** Übungen hinzufügen und Reihenfolge, Sätze, Wiederholungen, Gewicht sowie Pausen festlegen.
 5. Profil oben rechts wählen, Training starten, jeden Satz speichern.
 
@@ -12,7 +12,7 @@ Die letzte Eingabe desselben Profils und derselben Übung aus abgeschlossenen Ei
 
 ## Videos
 
-MP4 mit H.264-Video und AAC-Audio wird empfohlen. Maximal 512 MB pro Video. Die App prüft Container und Größe, konvertiert jedoch keine Videos; der Browser muss den enthaltenen Codec unterstützen. Start- und Endsekunden erlauben einen Ausschnitt aus längeren Videos. Daten werden lokal gespeichert und nicht an externe Dienste übertragen.
+MP4 und iPhone-MOV werden als Upload unterstützt. Für möglichst breite Wiedergabe-Kompatibilität wird H.264-Video mit AAC-Audio empfohlen. HEVC- und ProRes-Videos werden unverändert gespeichert und sind nur auf kompatiblen Geräten und Browsern abspielbar. Maximal 512 MB pro Video. Die App prüft Container und Größe, konvertiert jedoch keine Videos; der Browser muss den enthaltenen Codec unterstützen. Start- und Endsekunden erlauben einen Ausschnitt aus längeren Videos. Daten werden lokal gespeichert und nicht an externe Dienste übertragen.
 
 Wird ein Upload unterbrochen, bleibt die Übung erhalten; sie kann bearbeitet und das Video erneut hochgeladen werden. Ersetzte oder archivierte Videos bleiben gespeichert, da ältere Sessions darauf verweisen können. Es gibt noch keine automatische Speicherbereinigung. Achte auf ausreichend freien Speicher.
 
