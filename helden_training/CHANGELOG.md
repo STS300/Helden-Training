@@ -1,3 +1,12 @@
+# 0.1.4
+
+- Optionalen OneDrive-Freigabelink je Übung speichern, bearbeiten und entfernen (privates OneDrive / Microsoft 365 Family).
+- „Video in OneDrive ansehen“ in Übungsbibliothek, Vorschau und Training; neuer Tab mit noopener/noreferrer. Kein Upload und keine Microsoft-Anbindung der App notwendig.
+- Nur HTTPS-Links von 1drv.ms und onedrive.live.com akzeptieren; keine eingebetteten Zugangsdaten oder fremden Domains.
+- Link beim Start in der Trainingssession speichern. Spätere Änderungen betreffen bestehende Sessions nicht. Das Video selbst wird nicht kopiert.
+- Bestehende Datenbanken additiv erweitern, ältere Session-Snapshots weiterhin lesen und vorhandene Uploads erhalten. Lokales Video und OneDrive-Link können parallel vorhanden sein.
+- Link-Speicherung, Migration, Export und Öffnen im neuen Tab einschließlich Rückkehr zum Training in Chromium und iPhone-WebKit testen.
+
 # 0.1.3
 
 - Jeden Videoblock per FileReader explizit in einen kleinen ArrayBuffer einlesen; keine dateibasierten Blob-Objekte mehr an den Netzwerkprozess übergeben. Das umgeht den dokumentierten WebKit-Dateizugriffsfehler (https://bugs.webkit.org/show_bug.cgi?id=319985); die genaue Ursache auf dem Gerät der Benutzerin ist noch nicht bestätigt.

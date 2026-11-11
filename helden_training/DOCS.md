@@ -10,6 +10,21 @@
 
 Die letzte Eingabe desselben Profils und derselben Übung aus abgeschlossenen Einheiten wird als Ausgangswert vorgeschlagen. Null kg steht beispielsweise für eine Übung mit dem eigenen Körpergewicht; das Körpergewicht wird nicht zum Volumen addiert.
 
+## OneDrive-Video verlinken (Microsoft 365 Family)
+
+1. In OneDrive das Video auswählen und über **Teilen → Link kopieren** einen passenden Freigabelink erzeugen. Die Berechtigung „Ansehen“ genügt; die App benötigt keinen Bearbeitungszugriff.
+2. In Helden-Training eine Übung hinzufügen oder bearbeiten und den Link in **OneDrive-Freigabelink (optional)** einfügen.
+3. Übung speichern. Eine Videodatei muss dafür nicht ausgewählt oder hochgeladen werden.
+4. In der Bibliothek, Vorschau oder während des Trainings auf **Video in OneDrive ansehen** tippen. OneDrive öffnet sich in einem neuen Tab. Zum Protokollieren der Sätze zurück zum Training wechseln.
+
+Unterstützt werden HTTPS-Freigabelinks von `1drv.ms` und `onedrive.live.com`. Internetzugang und die passende OneDrive-Freigabe sind erforderlich; je nach Freigabe muss die Person im Browser bei Microsoft angemeldet sein. Ein Family-Abonnement allein ersetzt die Dateifreigabe nicht. Die App prüft die Linkform, nicht die tatsächlichen OneDrive-Zugriffsrechte oder Verfügbarkeit.
+
+Die App verbindet sich nicht mit deinem Microsoft-Konto und speichert keine Microsoft-Anmeldedaten. Sie speichert nur den eingegebenen Freigabelink. Wer in Home Assistant auf die App zugreifen kann, kann auch die gespeicherten Links sehen. Die eigentlichen Zugriffsrechte bleiben in OneDrive.
+
+Das Linkfeld kann zum Entfernen geleert werden. Ein bereits hochgeladenes Video bleibt erhalten; beide Quellen können parallel verwendet werden. Start-/Endzeiten der App gelten nur für hochgeladene Videos. Das 512-MB-Uploadlimit betrifft verlinkte Dateien nicht, weil sie nicht übertragen werden.
+
+Beim Trainingsstart wird der aktuelle Link in die Session kopiert. Eine spätere Linkänderung an der Übung verändert ältere Sessions nicht. Die App erstellt jedoch keine Videokopie: Wenn das Video in OneDrive gelöscht oder seine Freigabe geändert wird, kann auch der gespeicherte Link nicht mehr funktionieren. Die Wiedergabe direkt in der App und eine Microsoft-Graph-Anbindung sind nicht Bestandteil dieser Version.
+
 ## Videos
 
 MP4 und iPhone-MOV werden als Upload unterstützt. Für möglichst breite Wiedergabe-Kompatibilität wird H.264-Video mit AAC-Audio empfohlen. HEVC- und ProRes-Videos werden unverändert gespeichert und sind nur auf kompatiblen Geräten und Browsern abspielbar. Maximal 512 MB pro Video. Die App prüft Container und Größe, konvertiert jedoch keine Videos; der Browser muss den enthaltenen Codec unterstützen. Start- und Endsekunden erlauben einen Ausschnitt aus längeren Videos. Daten werden lokal gespeichert und nicht an externe Dienste übertragen.

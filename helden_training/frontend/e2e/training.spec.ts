@@ -372,3 +372,109 @@ for (const sent of [false, true]) {
     await expect(page.getByRole("alert")).not.toContainText("DATEI_LESEN");
   });
 }
+
+test("OneDrive-only exercise opens a new tab from library and training without uploads", async ({
+  page,
+  context,
+}, testInfo) => {
+  const link = "https://1drv.ms/v/c/example/TEST?e=demo";
+  await context.route("https://1drv.ms/**", (route) =>
+    route.fulfill({
+      contentType: "text/html",
+      body: "<!doctype html><html><body>OneDrive-Testvideo</body></html>",
+    }),
+  );
+  let videoRequests = 0;
+  page.on("request", (request) => {
+    if (request.method() === "POST" && request.url().includes("video-uploads"))
+      videoRequests++;
+  });
+  await page.goto("/api/hassio_ingress/test-token/");
+  await page.getByRole("button", { name: "Profile", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Profil anlegen", exact: true })
+    .click();
+  await page
+    .getByRole("textbox", { name: "Name", exact: true })
+    .fill(`OneDrive ${testInfo.project.name}`);
+  await page.getByRole("button", { name: "Profil speichern" }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await page.getByRole("button", { name: "Übungsbibliothek" }).click();
+  await page.getByRole("button", { name: "Übung hinzufügen" }).click();
+  const name = `OneDrive Übung ${testInfo.project.name}`;
+  await page.getByLabel("Übungsname").fill(name);
+  await page.getByLabel("OneDrive-Freigabelink (optional)").fill(link);
+  await page.getByRole("button", { name: "Übung speichern" }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  const card = page.locator(".exercise-card").filter({ hasText: name });
+  await expect(card).toContainText("ONEDRIVE-VIDEO");
+  await expect(
+    card.getByRole("link", { name: "Video in OneDrive ansehen" }),
+  ).toHaveAttribute("href", link);
+  await card.getByRole("button", { name: "Bearbeiten", exact: true }).click();
+  await expect(page.getByLabel("OneDrive-Freigabelink (optional)")).toHaveValue(
+    link,
+  );
+  await page.getByRole("button", { name: "Abbrechen", exact: true }).click();
+  await card
+    .getByRole("button", { name: `${name} ansehen`, exact: true })
+    .click();
+  const external = page
+    .getByRole("dialog")
+    .getByRole("link", { name: "Video in OneDrive ansehen" });
+  await expect(external).toHaveAttribute("target", "_blank");
+  await expect(external).toHaveAttribute("rel", "noopener noreferrer");
+  const [popup] = await Promise.all([
+    context.waitForEvent("page"),
+    external.click(),
+  ]);
+  await expect(popup.getByText("OneDrive-Testvideo")).toBeVisible();
+  expect(await popup.evaluate(() => window.opener === null)).toBeTruthy();
+  await popup.close();
+  await page.getByRole("button", { name: "Schließen", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Trainingspläne", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Plan erstellen", exact: true })
+    .click();
+  await page
+    .getByLabel("Name des Plans")
+    .fill(`OneDrive Plan ${testInfo.project.name}`);
+  await page
+    .getByRole("combobox", { name: "Übung hinzufügen" })
+    .selectOption({ label: `${name} · Ganzer Körper` });
+  await page.getByRole("dialog").locator(".add-exercise button").click();
+  await page.getByRole("button", { name: "Plan speichern" }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await page
+    .locator(".plan-card")
+    .filter({ hasText: `OneDrive Plan ${testInfo.project.name}` })
+    .getByRole("button", { name: "Training starten" })
+    .click();
+  await expect(page.locator(".training-main video")).toHaveCount(0);
+  await page
+    .getByLabel("Notiz Satz 1", { exact: true })
+    .fill("Bleibt nach OneDrive erhalten");
+  const [trainingVideo] = await Promise.all([
+    context.waitForEvent("page"),
+    page
+      .locator(".training-main")
+      .getByRole("link", { name: "Video in OneDrive ansehen" })
+      .click(),
+  ]);
+  await expect(trainingVideo.getByText("OneDrive-Testvideo")).toBeVisible();
+  await trainingVideo.close();
+  await expect(page.getByLabel("Notiz Satz 1", { exact: true })).toHaveValue(
+    "Bleibt nach OneDrive erhalten",
+  );
+  await page
+    .getByRole("button", { name: "Satz 1 speichern", exact: true })
+    .click();
+  await expect(page.locator(".set-row.saved")).toHaveCount(1);
+  expect(videoRequests).toBe(0);
+  await page.screenshot({
+    path: `test-results/onedrive-training-${testInfo.project.name}.png`,
+    fullPage: true,
+  });
+});

@@ -1576,3 +1576,14 @@ video {
     transition: none !important;
   }
 }
+
+.onedrive-video {
+  margin: 16px 0;
+}
+.onedrive-video p {
+  font-size: 11px;
+  margin: 9px 0 0;
+}
+.onedrive-video .primary {
+  white-space: normal;
+}

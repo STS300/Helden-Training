@@ -7,12 +7,13 @@ from contextlib import asynccontextmanager, contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import List, Optional
+from urllib.parse import urlsplit
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.exceptions import RequestValidationError
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, model_validator, field_validator
 
 from .media import MEDIA_TYPES, video_suffix
 from .uploads import UPLOAD_SCHEMA, register_uploads
@@ -37,6 +38,25 @@ class Exercise(BaseModel):
     notes: str = Field(default='', max_length=2000)
     start_seconds: float = Field(default=0, ge=0, le=86400)
     end_seconds: Optional[float] = Field(default=None, gt=0, le=86400)
+    onedrive_url: str = Field(default='', max_length=4096)
+
+    @field_validator('onedrive_url')
+    @classmethod
+    def validate_onedrive_url(cls, value):
+        value = value.strip()
+        if not value:
+            return ''
+        try:
+            parsed = urlsplit(value)
+            valid = (parsed.scheme == 'https' and parsed.hostname in ('1drv.ms', 'onedrive.live.com')
+                     and parsed.username is None and parsed.password is None and parsed.port in (None, 443)
+                     and not any(ord(char) < 32 or char.isspace() for char in value)
+                     and '\\' not in value)
+        except ValueError:
+            valid = False
+        if not valid:
+            raise ValueError('Bitte einen HTTPS-Freigabelink von 1drv.ms oder onedrive.live.com verwenden.')
+        return value
 
     @model_validator(mode='after')
     def validate_categories(self):
@@ -85,6 +105,7 @@ CREATE TABLE IF NOT EXISTS exercises (
  id INTEGER PRIMARY KEY, name TEXT NOT NULL, categories TEXT NOT NULL,
  muscles TEXT NOT NULL, equipment TEXT NOT NULL, notes TEXT NOT NULL,
  start_seconds REAL NOT NULL, end_seconds REAL, video TEXT,
+ onedrive_url TEXT NOT NULL DEFAULT '',
  archived INTEGER NOT NULL DEFAULT 0
 );
 CREATE TABLE IF NOT EXISTS plans (
@@ -138,13 +159,18 @@ def create_app(data_dir=None, static_dir=None, ingress_only=None):
         (data / 'videos').mkdir(exist_ok=True)
         with db() as conn:
             conn.executescript(SCHEMA + UPLOAD_SCHEMA)
+            # Additive migration: keep every existing exercise, video and session.
+            columns = {row['name'] for row in conn.execute('PRAGMA table_info(exercises)')}
+            if 'onedrive_url' not in columns:
+                conn.execute("ALTER TABLE exercises ADD COLUMN onedrive_url TEXT NOT NULL DEFAULT ''")
+            conn.execute('PRAGMA user_version=2')
         (data / 'uploads').mkdir(exist_ok=True)
         # Remove partial uploads left by a power interruption, never finished videos.
         for partial in (data / 'videos').glob('*.part'):
             partial.unlink(missing_ok=True)
         yield
 
-    app = FastAPI(title='Helden-Training', version='0.1.3', lifespan=lifespan,
+    app = FastAPI(title='Helden-Training', version='0.1.4', lifespan=lifespan,
                   docs_url=None, redoc_url=None, openapi_url=None)
 
     @app.exception_handler(RequestValidationError)
@@ -189,6 +215,7 @@ def create_app(data_dir=None, static_dir=None, ingress_only=None):
         for row in conn.execute('SELECT * FROM session_items WHERE session_id=? ORDER BY position', (identifier,)):
             item = dict(row)
             item['exercise'] = json.loads(item.pop('snapshot'))
+            item['exercise'].setdefault('onedrive_url', '')
             item['logs'] = [dict(r) for r in conn.execute('SELECT * FROM set_logs WHERE item_id=? ORDER BY set_index', (item['id'],))]
             previous = conn.execute('''SELECT l.weight, l.reps, l.set_index, s.id AS source_session FROM set_logs l
                 JOIN session_items i ON i.id=l.item_id JOIN sessions s ON s.id=i.session_id
@@ -215,7 +242,7 @@ def create_app(data_dir=None, static_dir=None, ingress_only=None):
 
     @app.get('/api/health')
     def health():
-        return {'status': 'ok', 'version': '0.1.3'}
+        return {'status': 'ok', 'version': '0.1.4'}
 
     @app.get('/api/categories')
     def categories():
@@ -259,13 +286,16 @@ def create_app(data_dir=None, static_dir=None, ingress_only=None):
     def save_exercise(conn, body, identifier=None):
         if not body.name.strip():
             raise HTTPException(422, 'Name darf nicht leer sein.')
-        values = (body.name.strip(), json.dumps(body.categories), body.muscles, body.equipment, body.notes, body.start_seconds, body.end_seconds)
+        link = body.onedrive_url
+        if identifier is not None and 'onedrive_url' not in body.model_fields_set:
+            link = get(conn, 'exercises', identifier, True)['onedrive_url']
+        values = (body.name.strip(), json.dumps(body.categories), body.muscles, body.equipment, body.notes, body.start_seconds, body.end_seconds, link)
         if identifier is None:
-            identifier = conn.execute('''INSERT INTO exercises(name,categories,muscles,equipment,notes,start_seconds,end_seconds)
-                VALUES (?,?,?,?,?,?,?)''', values).lastrowid
+            identifier = conn.execute('''INSERT INTO exercises(name,categories,muscles,equipment,notes,start_seconds,end_seconds,onedrive_url)
+                VALUES (?,?,?,?,?,?,?,?)''', values).lastrowid
         else:
             get(conn, 'exercises', identifier, True)
-            conn.execute('UPDATE exercises SET name=?,categories=?,muscles=?,equipment=?,notes=?,start_seconds=?,end_seconds=? WHERE id=?', values + (identifier,))
+            conn.execute('UPDATE exercises SET name=?,categories=?,muscles=?,equipment=?,notes=?,start_seconds=?,end_seconds=?,onedrive_url=? WHERE id=?', values + (identifier,))
         return exercise_dict(get(conn, 'exercises', identifier))
 
     @app.post('/api/exercises', status_code=201)

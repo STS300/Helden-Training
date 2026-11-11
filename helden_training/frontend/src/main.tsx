@@ -11,6 +11,7 @@ import {
   Download,
   Dumbbell,
   Flame,
+  ExternalLink,
   History,
   Home,
   Play,
@@ -113,6 +114,27 @@ function Empty({
     </div>
   );
 }
+function OneDriveVideo({ link }: { link?: string }) {
+  if (!link) return null;
+  return (
+    <div className="onedrive-video">
+      <a
+        className="primary"
+        href={link}
+        target="_blank"
+        rel="noopener noreferrer"
+      >
+        <ExternalLink size={17} />
+        Video in OneDrive ansehen
+      </a>
+      <p>
+        Öffnet einen neuen Tab. Je nach Freigabe ist eine Microsoft-Anmeldung
+        nötig.
+      </p>
+    </div>
+  );
+}
+
 function VideoPlayer({ path, exercise }: { path: string; exercise: Exercise }) {
   return (
     <video
@@ -540,16 +562,18 @@ function App() {
                         >
                           <Dumbbell size={48} strokeWidth={1.2} />
                           <span className="play-badge">
-                            {e.has_video ? (
+                            {e.has_video || e.onedrive_url ? (
                               <Play size={18} />
                             ) : (
                               <Plus size={18} />
                             )}
                           </span>
                           <span className="cover-label">
-                            {e.has_video
-                              ? "DEIN TRAININGSVIDEO"
-                              : "VIDEO ERGÄNZEN"}
+                            {e.onedrive_url
+                              ? "ONEDRIVE-VIDEO"
+                              : e.has_video
+                                ? "DEIN TRAININGSVIDEO"
+                                : "VIDEO ERGÄNZEN"}
                           </span>
                         </button>
                         <div className="card-body">
@@ -565,6 +589,7 @@ function App() {
                             {e.equipment || "Ohne Geräteangabe"}
                             {e.muscles && ` · ${e.muscles}`}
                           </p>
+                          <OneDriveVideo link={e.onedrive_url} />
                           <div className="card-actions">
                             <button
                               className="text-button"
@@ -853,7 +878,7 @@ function App() {
             </>
           )}
           <footer>
-            <Dumbbell size={14} /> HELDEN-TRAINING · 0.1.3{" "}
+            <Dumbbell size={14} /> HELDEN-TRAINING · 0.1.4{" "}
             <span>Dein Tempo. Dein Fortschritt.</span>
           </footer>
         </main>
@@ -890,12 +915,13 @@ function App() {
               path={`api/exercises/${preview.id}/video`}
               exercise={preview}
             />
-          ) : (
+          ) : !preview.onedrive_url ? (
             <Empty
               title="Noch kein Video"
-              text="Du kannst das Video über Bearbeiten ergänzen."
+              text="Du kannst ein Video hochladen oder einen OneDrive-Link hinterlegen."
             />
-          )}
+          ) : null}
+          <OneDriveVideo link={preview.onedrive_url} />
           <p>{preview.notes || "Noch keine Ausführungshinweise hinterlegt."}</p>
           <button
             className="secondary"
@@ -1053,6 +1079,7 @@ function ExerciseEditor({
     notes: exercise?.notes || "",
     start_seconds: exercise?.start_seconds || 0,
     end_seconds: exercise?.end_seconds ?? null,
+    onedrive_url: exercise?.onedrive_url || "",
   });
   const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
@@ -1065,6 +1092,24 @@ function ExerciseEditor({
     setBusy(true);
     setError("");
     try {
+      if (value.onedrive_url.trim()) {
+        let valid = false;
+        try {
+          const link = new URL(value.onedrive_url.trim());
+          valid =
+            link.protocol === "https:" &&
+            ["1drv.ms", "onedrive.live.com"].includes(link.hostname) &&
+            !link.username &&
+            !link.password &&
+            !link.port;
+        } catch {
+          /* invalid URL */
+        }
+        if (!valid)
+          throw new Error(
+            "Bitte einen HTTPS-Freigabelink von 1drv.ms oder onedrive.live.com einfügen.",
+          );
+      }
       if (file && file.size > 512 * 1024 * 1024)
         throw new Error("Das Video darf höchstens 512 MB groß sein.");
       const result = await api<Exercise>(
@@ -1150,6 +1195,23 @@ function ExerciseEditor({
             />
           </label>
         </div>
+        <label>
+          OneDrive-Freigabelink (optional)
+          <input
+            type="url"
+            maxLength={4096}
+            value={value.onedrive_url}
+            onChange={(e) =>
+              setValue({ ...value, onedrive_url: e.target.value })
+            }
+            placeholder="https://1drv.ms/v/…"
+          />
+        </label>
+        <p className="muted">
+          Video in OneDrive speichern und über „Teilen → Link kopieren“
+          verknüpfen. Der Link öffnet einen neuen Tab; ein Upload ist dafür
+          nicht nötig. Zugriffsrechte legst du in OneDrive fest.
+        </p>
         <label className="upload-zone">
           <Video size={25} />
           <strong>
@@ -1166,8 +1228,9 @@ function ExerciseEditor({
           />
         </label>
         <p className="muted">
-          MOV-Dateien werden unverändert gespeichert. Die Wiedergabe von
-          HEVC/ProRes hängt vom Gerät und Browser ab.
+          Start- und Endzeiten gelten nur für hochgeladene Videos, nicht für den
+          OneDrive-Player. MOV-Dateien werden unverändert gespeichert. Die
+          Wiedergabe von HEVC/ProRes hängt vom Gerät und Browser ab.
         </p>
         <div className="form-grid">
           <label>
@@ -1605,12 +1668,13 @@ function Training({
               path={`api/sessions/${session.id}/items/${item.id}/video`}
               exercise={item.exercise}
             />
-          ) : (
+          ) : !item.exercise.onedrive_url ? (
             <div className="no-video">
               <Dumbbell size={50} strokeWidth={1.2} />
               <p>Für diese Übung ist kein Video hinterlegt.</p>
             </div>
-          )}
+          ) : null}
+          <OneDriveVideo link={item.exercise.onedrive_url} />
           <p className="exercise-notes">
             {item.exercise.notes ||
               "Trainiere kontrolliert und in deinem Tempo."}
@@ -1624,7 +1688,7 @@ function Training({
               {item.rest_seconds} Sek. Pause
             </span>
           </div>
-          {item.skipped && (
+          {!!item.skipped && (
             <p className="notice">
               Diese Übung wurde übersprungen. Bereits gespeicherte Sätze bleiben
               erhalten.
