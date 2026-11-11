@@ -14,6 +14,9 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, model_validator
 
+from .media import MEDIA_TYPES, video_suffix
+from .uploads import UPLOAD_SCHEMA, register_uploads
+
 CATEGORIES = ['Ganzer Körper', 'Oberkörper', 'Unterkörper', 'Beine', 'Push', 'Pull']
 
 
@@ -134,13 +137,14 @@ def create_app(data_dir=None, static_dir=None, ingress_only=None):
         data.mkdir(parents=True, exist_ok=True)
         (data / 'videos').mkdir(exist_ok=True)
         with db() as conn:
-            conn.executescript(SCHEMA)
+            conn.executescript(SCHEMA + UPLOAD_SCHEMA)
+        (data / 'uploads').mkdir(exist_ok=True)
         # Remove partial uploads left by a power interruption, never finished videos.
         for partial in (data / 'videos').glob('*.part'):
             partial.unlink(missing_ok=True)
         yield
 
-    app = FastAPI(title='Helden-Training', version='0.1.1', lifespan=lifespan,
+    app = FastAPI(title='Helden-Training', version='0.1.2', lifespan=lifespan,
                   docs_url=None, redoc_url=None, openapi_url=None)
 
     @app.exception_handler(RequestValidationError)
@@ -211,7 +215,7 @@ def create_app(data_dir=None, static_dir=None, ingress_only=None):
 
     @app.get('/api/health')
     def health():
-        return {'status': 'ok', 'version': '0.1.1'}
+        return {'status': 'ok', 'version': '0.1.2'}
 
     @app.get('/api/categories')
     def categories():
@@ -285,7 +289,7 @@ def create_app(data_dir=None, static_dir=None, ingress_only=None):
         with db() as conn:
             get(conn, 'exercises', identifier, True)
         content_type = request.headers.get('content-type', '').split(';')[0].strip().lower()
-        if content_type not in ('video/mp4', 'video/quicktime', 'video/x-quicktime', 'application/octet-stream'):
+        if content_type not in MEDIA_TYPES:
             raise HTTPException(415, 'Bitte eine MP4- oder MOV-Datei hochladen.')
         if int(request.headers.get('content-length') or 0) > max_upload:
             raise HTTPException(413, 'Video überschreitet das Uploadlimit.')
@@ -303,14 +307,7 @@ def create_app(data_dir=None, static_dir=None, ingress_only=None):
                     if len(header) < 32:
                         header.extend(chunk[:32 - len(header)])
                     target.write(chunk)
-            modern_container = size >= 12 and header[4:8] == b'ftyp'
-            # Older QuickTime files may begin directly with an atom, without ftyp.
-            legacy_mov = (size >= 8 and header[4:8] in (b'moov', b'mdat', b'wide', b'free')
-                          and 8 <= int.from_bytes(header[:4], 'big') <= size)
-            if not modern_container and not legacy_mov:
-                raise HTTPException(415, 'Die Datei ist kein unterstützter MP4-/MOV-Container.')
-            is_mov = legacy_mov or header[8:12] == b'qt  ' or content_type in ('video/quicktime', 'video/x-quicktime')
-            filename = final.stem + ('.mov' if is_mov else '.mp4')
+            filename = final.stem + video_suffix(header, size, content_type)
             final = data / 'videos' / filename
             partial.rename(final)
             with db() as conn:
@@ -457,6 +454,8 @@ def create_app(data_dir=None, static_dir=None, ingress_only=None):
                       ('profiles', 'exercises', 'plans', 'plan_items', 'sessions', 'session_items', 'set_logs')}
         return JSONResponse({'format_version': 1, 'exported_at': now(), 'tables': tables},
                             headers={'Content-Disposition': 'attachment; filename="helden-training-daten.json"'})
+
+    register_uploads(app, db, data, get, max_upload)
 
     if (static / 'assets').is_dir():
         app.mount('/assets', StaticFiles(directory=static / 'assets'), name='assets')

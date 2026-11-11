@@ -7,7 +7,7 @@ Eine lokale Krafttrainings-App für **Home Assistant OS**. Eigene Übungsvideos,
 ## Funktionen der ersten Version
 
 - Profile anlegen, umbenennen, farblich kennzeichnen und archivieren.
-- Eigene MP4- und MOV-Videos hochladen, ersetzen und mit Start-/Endzeit versehen.
+- Eigene MP4- und MOV-Videos in kleinen bestätigten Blöcken hochladen, ersetzen und mit Start-/Endzeit versehen. Unterbrochene Blöcke werden wiederholt; ein erneuter Versuch im selben Dialog setzt bestätigte Teile fort.
 - Übungen nach **Ganzer Körper, Oberkörper, Unterkörper, Beine, Push und Pull** kategorisieren, durchsuchen und bearbeiten.
 - Pläne mit Übungsreihenfolge, Sätzen, Wiederholungen, Zielgewicht und Satzpausen erstellen, bearbeiten und duplizieren.
 - Jeden Satz mit Gewicht, Wiederholungen und optionaler Notiz sofort speichern.
@@ -44,7 +44,8 @@ Home Assistant (Anmeldung / Seitenleiste)
               ├── FastAPI / Python 3.13
               └── /data
                    ├── training.sqlite (+ WAL/SHM)
-                   └── videos/*.mp4
+                   ├── videos/*.{mp4,mov}
+                   └── uploads/*.part (temporär)
 ```
 
 Frontend, API und Videos werden unter demselben Ursprung ausgeliefert. Relative URLs erlauben den dynamischen Ingress-Pfad. Die API akzeptiert in der HA-Konfiguration ausschließlich Verbindungen des Supervisors `172.30.32.2`; Proxy-Header werden nicht als Client-IP vertraut. Schreibanfragen brauchen einen App-Header; fremde Browser-Ursprünge werden abgewiesen. SQLite verwendet Fremdschlüssel, WAL und Transaktionen. Satzspeicherung erfolgt idempotent nach Session-Übung und Satznummer. Historische Daten werden beim Archivieren erhalten.
@@ -90,6 +91,12 @@ HELDEN_PYTHON="$(pwd)/../../.venv/bin/python" npm run test:e2e
 
 Die Browserprüfungen starten einen isolierten Server mit temporärer Datenbank und prüfen Desktop sowie Smartphone **unter einem simulierten Ingress-Pfad**. API-Prüfungen decken Profiltrennung, Satzwiederholungen, unveränderliche Snapshots, Uploadlimits, Video-Range-Requests, Neustart, parallelen Trainingsstart und Zugriffsschutz ab. GitHub Actions führt diese Prüfungen und Container-Builds für `linux/amd64` und `linux/arm64` aus.
 
+## Update auf 0.1.2
+
+Vor dem Update ein vollständiges Home-Assistant-Backup erstellen. Bei Repository-Installation die App über den App-Store aktualisieren. Bei einer lokalen ZIP-Installation den Ordner `/addons/helden_training` durch den neuen Quellordner ersetzen und die lokale App neu bauen. Die App nicht deinstallieren oder ihr Datenverzeichnis löschen. Danach starten und die Weboberfläche vollständig neu laden, damit der neue Upload verwendet wird.
+
+Die Formaterweiterung in 0.1.1 allein beseitigte keine Größenlimits im Ingress. Der bisherige Upload verwendete `PUT`; [Home Assistant streamt mit `ingress_stream` jedoch nur `POST`](https://github.com/home-assistant/supervisor/blob/main/supervisor/api/ingress.py), sodass die vollständige Einzelanfrage eingelesen wurde. 0.1.2 überträgt Dateien deshalb in maximal 256 KiB großen HTTP-Anfragen; es gibt keine Neun-Sekunden-Spielzeitgrenze. Das Gesamtlimit bleibt bei 512 MB. Für HEVC/ProRes ist weiterhin ein kompatibler Browser erforderlich.
+
 ## Daten und Sicherung
 
 Alle Daten und Videos liegen im persistenten App-Verzeichnis `/data`. Die App fordert ein kaltes HA-Backup an. Sie muss in die Home-Assistant-Sicherung aufgenommen werden. Auch bei manuellen Sicherungen die App stoppen und das **gesamte** Datenverzeichnis kopieren. Der JSON-Export enthält keine Videodateien und besitzt noch keine Importfunktion.
@@ -98,7 +105,7 @@ Profile trennen Trainingswerte, aber keine Zugriffsrechte: Personen mit App-Zuga
 
 ## Weitere Ausbaustufen
 
-Diese Funktionen sind noch nicht Teil von 0.1.1:
+Diese Funktionen sind noch nicht Teil von 0.1.2:
 
 - MQTT-Anbindung für Licht, Lüfter, Musik und Trainingsereignisse.
 - Wochenkalender und Trainingsvorschläge nach Zeit und Geräten.

@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { readFileSync } from "node:fs";
 
 test("complete training flow through an Ingress prefix", async ({
   page,
@@ -130,3 +131,118 @@ for (const format of ["mp4", "mov"] as const) {
     // Container fixture only. Playback codec validation is a separate manual check.
   });
 }
+
+test("large MOV survives proxy size limit, slow transfer and lost response", async ({
+  page,
+}, testInfo) => {
+  test.setTimeout(60_000);
+  const freeAtom = Buffer.alloc(8);
+  freeAtom.writeUInt32BE(17 * 1024 * 1024 + 8, 0);
+  freeAtom.write("free", 4);
+  const payload = Buffer.concat([
+    readFileSync("../../tests/fixtures/hevc-main10-12s.mov"),
+    freeAtom,
+    Buffer.alloc(17 * 1024 * 1024),
+  ]);
+  let dropFirstResponse = true;
+  let largestRequest = 0;
+  let retries = 0;
+  await page.route("**/api/video-uploads/*", async (route) => {
+    if (route.request().method() !== "PUT") {
+      await route.continue();
+      return;
+    }
+    largestRequest = Math.max(
+      largestRequest,
+      route.request().postDataBuffer()?.length || 0,
+    );
+    if (testInfo.project.name === "desktop")
+      await new Promise((resolve) => setTimeout(resolve, 160));
+    const response = await route.fetch();
+    if (dropFirstResponse) {
+      dropFirstResponse = false;
+      retries++;
+      // Server committed the bytes but the success response was lost at the proxy.
+      await route.fulfill({
+        status: 502,
+        contentType: "text/plain",
+        body: "Proxy connection interrupted",
+      });
+    } else await route.fulfill({ response });
+  });
+  await page.goto("/api/hassio_ingress/test-token/");
+  await page.getByRole("button", { name: "Übungsbibliothek" }).click();
+  await page.getByRole("button", { name: "Übung hinzufügen" }).click();
+  const name = `Großes MOV ${testInfo.project.name}`;
+  await page.getByLabel("Übungsname").fill(name);
+  await page
+    .locator("input[type=file]")
+    .setInputFiles({ name: "iphone.MOV", mimeType: "", buffer: payload });
+  const started = Date.now();
+  await page.getByRole("button", { name: "Übung speichern" }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0, { timeout: 50_000 });
+  if (testInfo.project.name === "desktop")
+    expect(Date.now() - started).toBeGreaterThan(9000);
+  expect(largestRequest).toBeLessThanOrEqual(256 * 1024);
+  expect(retries).toBe(1);
+  await page
+    .getByRole("button", { name: `${name} ansehen`, exact: true })
+    .click();
+  const source = await page.locator("video").getAttribute("src");
+  const downloaded = await page.request.get(source!);
+  expect(downloaded.headers()["content-type"]).toBe("video/quicktime");
+  expect(Buffer.compare(await downloaded.body(), payload)).toBe(0);
+});
+
+test("manual retry resumes confirmed chunks without duplicating the exercise", async ({
+  page,
+}, testInfo) => {
+  const payload = Buffer.concat([
+    readFileSync("../../tests/fixtures/hevc-main10-12s.mov"),
+    Buffer.alloc(800_000),
+  ]);
+  let failures = 3;
+  const offsets: number[] = [];
+  await page.route("**/api/video-uploads/*", async (route) => {
+    if (route.request().method() !== "PUT") {
+      await route.continue();
+      return;
+    }
+    const offset = Number(
+      new URL(route.request().url()).searchParams.get("offset"),
+    );
+    offsets.push(offset);
+    const response = await route.fetch();
+    if (offset === 256 * 1024 && failures > 0) {
+      failures--;
+      await route.fulfill({ status: 502, body: "Lost acknowledgement" });
+    } else await route.fulfill({ response });
+  });
+  await page.goto("/api/hassio_ingress/test-token/");
+  await page.getByRole("button", { name: "Übungsbibliothek" }).click();
+  await page.getByRole("button", { name: "Übung hinzufügen" }).click();
+  const name = `Upload fortsetzen ${testInfo.project.name}`;
+  await page.getByLabel("Übungsname").fill(name);
+  await page.locator("input[type=file]").setInputFiles({
+    name: "resume.MOV",
+    mimeType: "video/quicktime",
+    buffer: payload,
+  });
+  await page.getByRole("button", { name: "Übung speichern" }).click();
+  await expect(page.getByRole("alert")).toContainText(
+    "Bereits bestätigte Teile bleiben erhalten",
+  );
+  expect(offsets).toEqual([0, 262144, 262144, 262144]);
+  await page.getByRole("button", { name: "Übung speichern" }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  expect(offsets[4]).toBe(524288);
+  const card = page.locator(".exercise-card").filter({ hasText: name });
+  await expect(card).toHaveCount(1);
+  await page
+    .getByRole("button", { name: `${name} ansehen`, exact: true })
+    .click();
+  const result = await page.request.get(
+    (await page.locator("video").getAttribute("src"))!,
+  );
+  expect(Buffer.compare(await result.body(), payload)).toBe(0);
+});
