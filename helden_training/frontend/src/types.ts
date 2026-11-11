@@ -21,6 +21,8 @@ export interface Exercise {
   start_seconds: number;
   end_seconds: number | null;
   has_video: boolean;
+  has_uploaded_video?: boolean;
+  media_path?: string;
   onedrive_url?: string;
   video?: string;
 }

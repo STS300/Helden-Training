@@ -1,5 +1,6 @@
 """Isolated ephemeral backend, also mounted behind a simulated Ingress prefix."""
 import tempfile
+from pathlib import Path
 
 import uvicorn
 from fastapi import FastAPI
@@ -7,7 +8,11 @@ from fastapi import FastAPI
 from helden_training.backend.app import create_app
 
 with tempfile.TemporaryDirectory(prefix='helden-e2e-') as directory:
-    app = create_app(directory, ingress_only=False)
+    media = Path(directory) / 'training-media'
+    (media / 'Beine').mkdir(parents=True)
+    (media / 'Beine' / 'Kniebeuge.MOV').write_bytes((Path(__file__).parent / 'fixtures' / 'hevc-main10-12s.mov').read_bytes())
+    (media / 'Beine' / 'Ausfallschritt.MOV').write_bytes((Path(__file__).parent / 'fixtures' / 'hevc-main10-12s.mov').read_bytes())
+    app = create_app(directory, ingress_only=False, media_dir=media)
     # A mount exercises relative frontend/API/video paths just like HA Ingress.
     outer = FastAPI()
 

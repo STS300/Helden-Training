@@ -1,3 +1,11 @@
+# 0.1.5
+
+- Lokale Videos aus `/media/helden-training` mit Ordnerauswahl direkt Übungen zuordnen und in Vorschau und Training abspielen; kein Browser-Upload oder OneDrive-Login nötig.
+- Medienverzeichnis schreibgeschützt in die Home-Assistant-App einbinden; MP4, MOV, M4V und WebM mit Range-Anfragen zum Spulen ausliefern.
+- Pfadzugriffe auf den Trainingsordner begrenzen; versteckte Dateien und Verknüpfungen außerhalb des Ordners ausblenden und abweisen.
+- Bestehende Datenbanken und ältere Sessions kompatibel erweitern. Sessions behalten ihren Dateipfad; Dateien selbst bleiben extern und müssen separat gesichert werden.
+- Anleitung für die Übertragung per Samba von iPhone/iPad und Docker-Medienordner ergänzen.
+
 # 0.1.4
 
 - Optionalen OneDrive-Freigabelink je Übung speichern, bearbeiten und entfernen (privates OneDrive / Microsoft 365 Family).

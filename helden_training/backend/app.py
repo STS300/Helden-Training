@@ -17,6 +17,7 @@ from pydantic import BaseModel, Field, model_validator, field_validator
 
 from .media import MEDIA_TYPES, video_suffix
 from .uploads import UPLOAD_SCHEMA, register_uploads
+from .local_media import LocalMedia
 
 CATEGORIES = ['Ganzer Körper', 'Oberkörper', 'Unterkörper', 'Beine', 'Push', 'Pull']
 
@@ -39,6 +40,12 @@ class Exercise(BaseModel):
     start_seconds: float = Field(default=0, ge=0, le=86400)
     end_seconds: Optional[float] = Field(default=None, gt=0, le=86400)
     onedrive_url: str = Field(default='', max_length=4096)
+    media_path: str = Field(default='', max_length=1024)
+
+    @field_validator('media_path')
+    @classmethod
+    def validate_media_path(cls, value):
+        return LocalMedia.relative(value)
 
     @field_validator('onedrive_url')
     @classmethod
@@ -106,6 +113,7 @@ CREATE TABLE IF NOT EXISTS exercises (
  muscles TEXT NOT NULL, equipment TEXT NOT NULL, notes TEXT NOT NULL,
  start_seconds REAL NOT NULL, end_seconds REAL, video TEXT,
  onedrive_url TEXT NOT NULL DEFAULT '',
+ media_path TEXT NOT NULL DEFAULT '',
  archived INTEGER NOT NULL DEFAULT 0
 );
 CREATE TABLE IF NOT EXISTS plans (
@@ -136,11 +144,12 @@ PRAGMA user_version=1;
 '''
 
 
-def create_app(data_dir=None, static_dir=None, ingress_only=None):
+def create_app(data_dir=None, static_dir=None, ingress_only=None, media_dir=None):
     data = Path(data_dir or os.getenv('DATA_DIR', './data'))
     static = Path(static_dir or Path(__file__).parent.parent / 'frontend' / 'dist')
     restricted = ingress_only if ingress_only is not None else os.getenv('INGRESS_ONLY', 'true').lower() == 'true'
     max_upload = int(os.getenv('MAX_UPLOAD_MB', '512')) * 1024 * 1024
+    local_media = LocalMedia(media_dir or os.getenv('MEDIA_DIR', '/media/helden-training'))
 
     @contextmanager
     def db():
@@ -163,14 +172,16 @@ def create_app(data_dir=None, static_dir=None, ingress_only=None):
             columns = {row['name'] for row in conn.execute('PRAGMA table_info(exercises)')}
             if 'onedrive_url' not in columns:
                 conn.execute("ALTER TABLE exercises ADD COLUMN onedrive_url TEXT NOT NULL DEFAULT ''")
-            conn.execute('PRAGMA user_version=2')
+            if 'media_path' not in columns:
+                conn.execute("ALTER TABLE exercises ADD COLUMN media_path TEXT NOT NULL DEFAULT ''")
+            conn.execute('PRAGMA user_version=3')
         (data / 'uploads').mkdir(exist_ok=True)
         # Remove partial uploads left by a power interruption, never finished videos.
         for partial in (data / 'videos').glob('*.part'):
             partial.unlink(missing_ok=True)
         yield
 
-    app = FastAPI(title='Helden-Training', version='0.1.4', lifespan=lifespan,
+    app = FastAPI(title='Helden-Training', version='0.1.5', lifespan=lifespan,
                   docs_url=None, redoc_url=None, openapi_url=None)
 
     @app.exception_handler(RequestValidationError)
@@ -206,7 +217,8 @@ def create_app(data_dir=None, static_dir=None, ingress_only=None):
     def exercise_dict(row):
         result = dict(row)
         result['categories'] = json.loads(result['categories'])
-        result['has_video'] = bool(result.pop('video'))
+        result['has_uploaded_video'] = bool(result.pop('video'))
+        result['has_video'] = result['has_uploaded_video'] or bool(result.get('media_path'))
         return result
 
     def session_detail(conn, identifier):
@@ -216,6 +228,7 @@ def create_app(data_dir=None, static_dir=None, ingress_only=None):
             item = dict(row)
             item['exercise'] = json.loads(item.pop('snapshot'))
             item['exercise'].setdefault('onedrive_url', '')
+            item['exercise'].setdefault('media_path', '')
             item['logs'] = [dict(r) for r in conn.execute('SELECT * FROM set_logs WHERE item_id=? ORDER BY set_index', (item['id'],))]
             previous = conn.execute('''SELECT l.weight, l.reps, l.set_index, s.id AS source_session FROM set_logs l
                 JOIN session_items i ON i.id=l.item_id JOIN sessions s ON s.id=i.session_id
@@ -242,7 +255,11 @@ def create_app(data_dir=None, static_dir=None, ingress_only=None):
 
     @app.get('/api/health')
     def health():
-        return {'status': 'ok', 'version': '0.1.4'}
+        return {'status': 'ok', 'version': '0.1.5'}
+
+    @app.get('/api/local-media')
+    def browse_media(folder: str = ''):
+        return local_media.browse(folder)
 
     @app.get('/api/categories')
     def categories():
@@ -289,13 +306,18 @@ def create_app(data_dir=None, static_dir=None, ingress_only=None):
         link = body.onedrive_url
         if identifier is not None and 'onedrive_url' not in body.model_fields_set:
             link = get(conn, 'exercises', identifier, True)['onedrive_url']
-        values = (body.name.strip(), json.dumps(body.categories), body.muscles, body.equipment, body.notes, body.start_seconds, body.end_seconds, link)
+        media_path = body.media_path
+        if identifier is not None and 'media_path' not in body.model_fields_set:
+            media_path = get(conn, 'exercises', identifier, True)['media_path']
+        if media_path and (identifier is None or media_path != get(conn, 'exercises', identifier, True)['media_path']):
+            local_media.resolve(media_path)
+        values = (body.name.strip(), json.dumps(body.categories), body.muscles, body.equipment, body.notes, body.start_seconds, body.end_seconds, link, media_path)
         if identifier is None:
-            identifier = conn.execute('''INSERT INTO exercises(name,categories,muscles,equipment,notes,start_seconds,end_seconds,onedrive_url)
-                VALUES (?,?,?,?,?,?,?,?)''', values).lastrowid
+            identifier = conn.execute('''INSERT INTO exercises(name,categories,muscles,equipment,notes,start_seconds,end_seconds,onedrive_url,media_path)
+                VALUES (?,?,?,?,?,?,?,?,?)''', values).lastrowid
         else:
             get(conn, 'exercises', identifier, True)
-            conn.execute('UPDATE exercises SET name=?,categories=?,muscles=?,equipment=?,notes=?,start_seconds=?,end_seconds=?,onedrive_url=? WHERE id=?', values + (identifier,))
+            conn.execute('UPDATE exercises SET name=?,categories=?,muscles=?,equipment=?,notes=?,start_seconds=?,end_seconds=?,onedrive_url=?,media_path=? WHERE id=?', values + (identifier,))
         return exercise_dict(get(conn, 'exercises', identifier))
 
     @app.post('/api/exercises', status_code=201)
@@ -351,21 +373,26 @@ def create_app(data_dir=None, static_dir=None, ingress_only=None):
             final.unlink(missing_ok=True)
             raise
 
-    @app.get('/api/exercises/{identifier}/video')
+    @app.api_route('/api/exercises/{identifier}/video', methods=['GET', 'HEAD'])
     def exercise_video(identifier: int):
         with db() as conn:
             exercise = get(conn, 'exercises', identifier)
+        if exercise.get('media_path'):
+            return local_media.video(exercise['media_path'])
         if not exercise['video'] or not (data / 'videos' / exercise['video']).is_file():
             raise HTTPException(404, 'Kein Video vorhanden.')
         return FileResponse(data / 'videos' / exercise['video'], media_type='video/quicktime' if Path(exercise['video']).suffix == '.mov' else 'video/mp4')
 
-    @app.get('/api/sessions/{session_id}/items/{item_id}/video')
+    @app.api_route('/api/sessions/{session_id}/items/{item_id}/video', methods=['GET', 'HEAD'])
     def session_video(session_id: int, item_id: int):
         with db() as conn:
             item = get(conn, 'session_items', item_id)
         if item['session_id'] != session_id:
             raise HTTPException(404)
-        filename = json.loads(item['snapshot']).get('video')
+        snapshot = json.loads(item['snapshot'])
+        if snapshot.get('media_path'):
+            return local_media.video(snapshot['media_path'])
+        filename = snapshot.get('video')
         if not filename or not (data / 'videos' / filename).is_file():
             raise HTTPException(404, 'Kein Video vorhanden.')
         return FileResponse(data / 'videos' / filename, media_type='video/quicktime' if Path(filename).suffix == '.mov' else 'video/mp4')

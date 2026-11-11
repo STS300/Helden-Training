@@ -1587,3 +1587,59 @@ video {
 .onedrive-video .primary {
   white-space: normal;
 }
+
+.media-source-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.media-picker {
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 16px;
+  margin: 16px 0;
+  background: #f8faf3;
+}
+.media-picker .section-heading {
+  margin-top: 0;
+}
+.media-picker-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 14px 0;
+}
+.media-picker-toolbar > span {
+  flex: 1;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+}
+.media-picker-list {
+  max-height: 300px;
+  overflow: auto;
+}
+.media-picker-row {
+  display: flex;
+  width: 100%;
+  gap: 12px;
+  text-align: left;
+  padding: 12px 4px;
+  border-bottom: 1px solid var(--line);
+}
+.media-picker-row > span:first-of-type {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+}
+.media-picker-row > span:last-child {
+  font-size: 10px;
+  color: var(--muted);
+}
+.media-picker-row small {
+  display: block;
+  font-size: 10px;
+  color: var(--muted);
+  margin-top: 3px;
+}

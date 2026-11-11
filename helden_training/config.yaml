@@ -1,5 +1,5 @@
 name: Helden-Training
-version: "0.1.4"
+version: "0.1.5"
 slug: helden_training
 description: Eigene Trainingsvideos, persönliche Profile und Krafttrainingspläne
 url: https://github.com/STS300/Helden-Training
@@ -16,5 +16,8 @@ panel_icon: mdi:weight-lifter
 panel_title: Helden-Training
 panel_admin: false
 backup: cold
+map:
+  - type: media
+    read_only: true
 options: {}
 schema: {}

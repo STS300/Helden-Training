@@ -25,6 +25,7 @@ import {
   X,
 } from "lucide-react";
 import { api, upload, url } from "./api";
+import { LocalMediaPicker } from "./LocalMediaPicker";
 import {
   categories,
   Exercise,
@@ -569,11 +570,13 @@ function App() {
                             )}
                           </span>
                           <span className="cover-label">
-                            {e.onedrive_url
-                              ? "ONEDRIVE-VIDEO"
-                              : e.has_video
-                                ? "DEIN TRAININGSVIDEO"
-                                : "VIDEO ERGÄNZEN"}
+                            {e.media_path
+                              ? "LOKALES VIDEO"
+                              : e.onedrive_url
+                                ? "ONEDRIVE-VIDEO"
+                                : e.has_video
+                                  ? "DEIN TRAININGSVIDEO"
+                                  : "VIDEO ERGÄNZEN"}
                           </span>
                         </button>
                         <div className="card-body">
@@ -878,7 +881,7 @@ function App() {
             </>
           )}
           <footer>
-            <Dumbbell size={14} /> HELDEN-TRAINING · 0.1.4{" "}
+            <Dumbbell size={14} /> HELDEN-TRAINING · 0.1.5{" "}
             <span>Dein Tempo. Dein Fortschritt.</span>
           </footer>
         </main>
@@ -1080,8 +1083,10 @@ function ExerciseEditor({
     start_seconds: exercise?.start_seconds || 0,
     end_seconds: exercise?.end_seconds ?? null,
     onedrive_url: exercise?.onedrive_url || "",
+    media_path: exercise?.media_path || "",
   });
   const [file, setFile] = useState<File | null>(null);
+  const [mediaPicker, setMediaPicker] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [progress, setProgress] = useState(0);
@@ -1110,7 +1115,12 @@ function ExerciseEditor({
             "Bitte einen HTTPS-Freigabelink von 1drv.ms oder onedrive.live.com einfügen.",
           );
       }
-      if (file && !value.onedrive_url.trim() && file.size > 512 * 1024 * 1024)
+      if (
+        file &&
+        !value.onedrive_url.trim() &&
+        !value.media_path &&
+        file.size > 512 * 1024 * 1024
+      )
         throw new Error("Das Video darf höchstens 512 MB groß sein.");
       const result = await api<Exercise>(
         savedId ? `exercises/${savedId}` : "exercises",
@@ -1118,7 +1128,7 @@ function ExerciseEditor({
         value,
       );
       setSavedId(result.id);
-      if (file && !value.onedrive_url.trim())
+      if (file && !value.onedrive_url.trim() && !value.media_path)
         await upload(result.id, file, setProgress, setUploadStatus);
       await onSaved();
       onClose();
@@ -1197,6 +1207,47 @@ function ExerciseEditor({
           </label>
         </div>
         <label>
+          Lokales Video auf Home Assistant
+          <input
+            value={value.media_path}
+            readOnly
+            placeholder="Noch kein lokales Video ausgewählt"
+          />
+        </label>
+        <div className="media-source-actions">
+          <button
+            type="button"
+            className="secondary"
+            onClick={() => setMediaPicker(!mediaPicker)}
+          >
+            Lokales Video auswählen
+          </button>
+          {value.media_path && (
+            <button
+              type="button"
+              className="text-button"
+              onClick={() => setValue({ ...value, media_path: "" })}
+            >
+              Zuordnung entfernen
+            </button>
+          )}
+        </div>
+        {mediaPicker && (
+          <LocalMediaPicker
+            onClose={() => setMediaPicker(false)}
+            onChoose={(path) => {
+              setValue({ ...value, media_path: path });
+              setMediaPicker(false);
+            }}
+          />
+        )}
+        {value.media_path && (
+          <p className="notice">
+            Lokales Video aktiv: Die Datei wird direkt aus dem Medienordner
+            abgespielt. Kein Upload und keine Kopie nötig.
+          </p>
+        )}
+        <label>
           OneDrive-Freigabelink (optional)
           <input
             type="url"
@@ -1223,14 +1274,14 @@ function ExerciseEditor({
           <Video size={25} />
           <strong>
             {file?.name ||
-              (exercise?.has_video
+              (exercise?.has_uploaded_video
                 ? "Video ersetzen (optional)"
                 : "Eigenes Video hinzufügen (optional)")}
           </strong>
           <span>MP4 oder MOV (iPhone) · maximal 512 MB</span>
           <input
             type="file"
-            disabled={!!value.onedrive_url.trim()}
+            disabled={!!value.onedrive_url.trim() || !!value.media_path}
             accept="video/mp4,video/quicktime,video/x-quicktime,.mp4,.mov"
             onChange={(e) => setFile(e.target.files?.[0] || null)}
           />
@@ -1280,7 +1331,7 @@ function ExerciseEditor({
             onChange={(e) => setValue({ ...value, notes: e.target.value })}
           />
         </label>
-        {busy && file && !value.onedrive_url.trim() && (
+        {busy && file && !value.onedrive_url.trim() && !value.media_path && (
           <div role="status">
             <p>Video-Upload: {progress.toLocaleString("de-DE")} % bestätigt</p>
             <p>{uploadStatus}</p>
@@ -1670,7 +1721,7 @@ function Training({
               <h2>{item.exercise.name}</h2>
             </div>
           </div>
-          {item.exercise.video ? (
+          {item.exercise.media_path || item.exercise.video ? (
             <VideoPlayer
               key={item.id}
               path={`api/sessions/${session.id}/items/${item.id}/video`}

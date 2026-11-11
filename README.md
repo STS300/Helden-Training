@@ -6,6 +6,7 @@ Eine lokale Krafttrainings-App für **Home Assistant OS**. Eigene Übungsvideos,
 
 ## Funktionen der ersten Version
 
+- Lokale Videos aus `/media/helden-training` auswählen und direkt in der App abspielen; Dateien zuvor etwa per Samba auf Home Assistant kopieren.
 - Profile anlegen, umbenennen, farblich kennzeichnen und archivieren.
 - OneDrive-Freigabelink je Übung speichern und das Video in einem neuen Tab aus Bibliothek oder Training öffnen; kein Video-Upload erforderlich.
 - Eigene MP4- und MOV-Videos in kleinen bestätigten Blöcken hochladen, ersetzen und mit Start-/Endzeit versehen. Unterbrochene Blöcke werden wiederholt; ein erneuter Versuch im selben Dialog setzt bestätigte Teile fort.
@@ -56,6 +57,7 @@ Frontend, API und Videos werden unter demselben Ursprung ausgeliefert. Relative 
 Mit Docker und Docker Compose:
 
 ```sh
+mkdir -p media/helden-training
 docker compose up --build -d
 ```
 

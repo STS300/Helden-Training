@@ -483,3 +483,46 @@ test("OneDrive-only exercise opens a new tab from library and training without u
     fullPage: true,
   });
 });
+
+test("Local media can be selected and streamed through Ingress without upload", async ({
+  page,
+}, testInfo) => {
+  let uploads = 0;
+  page.on("request", (request) => {
+    if (request.method() === "POST" && request.url().includes("video-uploads"))
+      uploads++;
+  });
+  await page.goto("/api/hassio_ingress/test-token/");
+  await page.getByRole("button", { name: "Übungsbibliothek" }).click();
+  await page.getByRole("button", { name: "Übung hinzufügen" }).click();
+  const name = `Lokales Video ${testInfo.project.name}`;
+  await page.getByLabel("Übungsname").fill(name);
+  await page
+    .getByRole("button", { name: "Lokales Video auswählen", exact: true })
+    .click();
+  const picker = page.getByRole("region", { name: "Lokale Videos auswählen" });
+  await picker.getByRole("button", { name: "Beine Öffnen" }).click();
+  await picker.getByRole("button", { name: /Kniebeuge.MOV/ }).click();
+  await expect(page.getByLabel("Lokales Video auf Home Assistant")).toHaveValue(
+    "Beine/Kniebeuge.MOV",
+  );
+  await expect(page.locator("input[type=file]")).toBeDisabled();
+  await page.getByRole("button", { name: "Übung speichern" }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  const card = page.locator(".exercise-card").filter({ hasText: name });
+  await expect(card).toContainText("LOKALES VIDEO");
+  await card
+    .getByRole("button", { name: `${name} ansehen`, exact: true })
+    .click();
+  const source = await page.locator("video").getAttribute("src");
+  expect(source).toContain("/api/hassio_ingress/test-token/api/exercises/");
+  const response = await page.request.get(source!, {
+    headers: { Range: "bytes=0-31" },
+  });
+  expect(response.status()).toBe(206);
+  expect(response.headers()["content-type"]).toBe("video/quicktime");
+  expect(await response.body()).toEqual(
+    readFileSync("../../tests/fixtures/hevc-main10-12s.mov").subarray(0, 32),
+  );
+  expect(uploads).toBe(0);
+});
