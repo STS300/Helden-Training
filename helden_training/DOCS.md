@@ -21,7 +21,7 @@ Unterstützt werden HTTPS-Freigabelinks von `1drv.ms` und `onedrive.live.com`. I
 
 Die App verbindet sich nicht mit deinem Microsoft-Konto und speichert keine Microsoft-Anmeldedaten. Sie speichert nur den eingegebenen Freigabelink. Wer in Home Assistant auf die App zugreifen kann, kann auch die gespeicherten Links sehen. Die eigentlichen Zugriffsrechte bleiben in OneDrive.
 
-Das Linkfeld kann zum Entfernen geleert werden. Ein bereits hochgeladenes Video bleibt erhalten; beide Quellen können parallel verwendet werden. Start-/Endzeiten der App gelten nur für hochgeladene Videos. Das 512-MB-Uploadlimit betrifft verlinkte Dateien nicht, weil sie nicht übertragen werden.
+Solange ein OneDrive-Link eingetragen ist, wird auch eine zuvor ausgewählte Videodatei nicht hochgeladen. Das Linkfeld kann zum Entfernen geleert werden. Ein bereits hochgeladenes Video bleibt erhalten; beide Quellen können parallel verwendet werden. Start-/Endzeiten der App gelten nur für hochgeladene Videos. Das 512-MB-Uploadlimit betrifft verlinkte Dateien nicht, weil sie nicht übertragen werden.
 
 Beim Trainingsstart wird der aktuelle Link in die Session kopiert. Eine spätere Linkänderung an der Übung verändert ältere Sessions nicht. Die App erstellt jedoch keine Videokopie: Wenn das Video in OneDrive gelöscht oder seine Freigabe geändert wird, kann auch der gespeicherte Link nicht mehr funktionieren. Die Wiedergabe direkt in der App und eine Microsoft-Graph-Anbindung sind nicht Bestandteil dieser Version.
 

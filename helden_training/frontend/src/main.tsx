@@ -1110,7 +1110,7 @@ function ExerciseEditor({
             "Bitte einen HTTPS-Freigabelink von 1drv.ms oder onedrive.live.com einfügen.",
           );
       }
-      if (file && file.size > 512 * 1024 * 1024)
+      if (file && !value.onedrive_url.trim() && file.size > 512 * 1024 * 1024)
         throw new Error("Das Video darf höchstens 512 MB groß sein.");
       const result = await api<Exercise>(
         savedId ? `exercises/${savedId}` : "exercises",
@@ -1118,7 +1118,8 @@ function ExerciseEditor({
         value,
       );
       setSavedId(result.id);
-      if (file) await upload(result.id, file, setProgress, setUploadStatus);
+      if (file && !value.onedrive_url.trim())
+        await upload(result.id, file, setProgress, setUploadStatus);
       await onSaved();
       onClose();
     } catch (e) {
@@ -1212,6 +1213,12 @@ function ExerciseEditor({
           verknüpfen. Der Link öffnet einen neuen Tab; ein Upload ist dafür
           nicht nötig. Zugriffsrechte legst du in OneDrive fest.
         </p>
+        {value.onedrive_url.trim() && (
+          <p className="notice">
+            OneDrive-Link aktiv: Es wird keine ausgewählte Videodatei
+            hochgeladen. Ein bereits gespeichertes Video bleibt erhalten.
+          </p>
+        )}
         <label className="upload-zone">
           <Video size={25} />
           <strong>
@@ -1223,6 +1230,7 @@ function ExerciseEditor({
           <span>MP4 oder MOV (iPhone) · maximal 512 MB</span>
           <input
             type="file"
+            disabled={!!value.onedrive_url.trim()}
             accept="video/mp4,video/quicktime,video/x-quicktime,.mp4,.mov"
             onChange={(e) => setFile(e.target.files?.[0] || null)}
           />
@@ -1272,7 +1280,7 @@ function ExerciseEditor({
             onChange={(e) => setValue({ ...value, notes: e.target.value })}
           />
         </label>
-        {busy && file && (
+        {busy && file && !value.onedrive_url.trim() && (
           <div role="status">
             <p>Video-Upload: {progress.toLocaleString("de-DE")} % bestätigt</p>
             <p>{uploadStatus}</p>

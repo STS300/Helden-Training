@@ -403,7 +403,12 @@ test("OneDrive-only exercise opens a new tab from library and training without u
   await page.getByRole("button", { name: "Übung hinzufügen" }).click();
   const name = `OneDrive Übung ${testInfo.project.name}`;
   await page.getByLabel("Übungsname").fill(name);
+  // A link also replaces an already selected upload as the active input source.
+  await page
+    .locator("input[type=file]")
+    .setInputFiles("../../tests/fixtures/hevc-main10-12s.mov");
   await page.getByLabel("OneDrive-Freigabelink (optional)").fill(link);
+  await expect(page.locator("input[type=file]")).toBeDisabled();
   await page.getByRole("button", { name: "Übung speichern" }).click();
   await expect(page.getByRole("dialog")).toHaveCount(0);
   const card = page.locator(".exercise-card").filter({ hasText: name });
