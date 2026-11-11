@@ -11,7 +11,7 @@ concurrency:
 jobs:
   test:
     timeout-minutes: 15
-    runs-on: ubuntu-24.04
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -26,15 +26,7 @@ jobs:
       - run: python -m pytest -q
       - run: npm ci && npm run format:check && npm run build
         working-directory: helden_training/frontend
-      - name: Use reachable Ubuntu HTTPS package mirrors
-        run: |
-          if [ -f /etc/apt/apt-mirrors.txt ]; then
-            echo 'https://archive.ubuntu.com/ubuntu/' | sudo tee /etc/apt/apt-mirrors.txt
-          fi
-          if [ -f /etc/apt/apt-mirrors-security.txt ]; then
-            echo 'https://security.ubuntu.com/ubuntu/' | sudo tee /etc/apt/apt-mirrors-security.txt
-          fi
-      - run: npx playwright install --with-deps chromium webkit
+      - run: npx playwright install chromium webkit
         working-directory: helden_training/frontend
       - run: npm run test:e2e
         working-directory: helden_training/frontend
