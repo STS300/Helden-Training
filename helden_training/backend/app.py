@@ -144,7 +144,7 @@ def create_app(data_dir=None, static_dir=None, ingress_only=None):
             partial.unlink(missing_ok=True)
         yield
 
-    app = FastAPI(title='Helden-Training', version='0.1.2', lifespan=lifespan,
+    app = FastAPI(title='Helden-Training', version='0.1.3', lifespan=lifespan,
                   docs_url=None, redoc_url=None, openapi_url=None)
 
     @app.exception_handler(RequestValidationError)
@@ -215,7 +215,7 @@ def create_app(data_dir=None, static_dir=None, ingress_only=None):
 
     @app.get('/api/health')
     def health():
-        return {'status': 'ok', 'version': '0.1.2'}
+        return {'status': 'ok', 'version': '0.1.3'}
 
     @app.get('/api/categories')
     def categories():

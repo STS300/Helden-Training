@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 
 test("complete training flow through an Ingress prefix", async ({
   page,
@@ -148,7 +148,10 @@ test("large MOV survives proxy size limit, slow transfer and lost response", asy
   let largestRequest = 0;
   let retries = 0;
   await page.route("**/api/video-uploads/*", async (route) => {
-    if (route.request().method() !== "PUT") {
+    if (
+      route.request().method() !== "POST" ||
+      new URL(route.request().url()).pathname.endsWith("/finish")
+    ) {
       await route.continue();
       return;
     }
@@ -204,7 +207,10 @@ test("manual retry resumes confirmed chunks without duplicating the exercise", a
   let failures = 3;
   const offsets: number[] = [];
   await page.route("**/api/video-uploads/*", async (route) => {
-    if (route.request().method() !== "PUT") {
+    if (
+      route.request().method() !== "POST" ||
+      new URL(route.request().url()).pathname.endsWith("/finish")
+    ) {
       await route.continue();
       return;
     }
@@ -246,3 +252,123 @@ test("manual retry resumes confirmed chunks without duplicating the exercise", a
   );
   expect(Buffer.compare(await result.body(), payload)).toBe(0);
 });
+
+test("disk-backed 38.5 MB HEVC MOV is read into memory before every network request", async ({
+  page,
+}, testInfo) => {
+  test.setTimeout(90_000);
+  // Reproduce the affected WebKit contract: serializing a file-backed Blob fails,
+  // whereas explicitly read ArrayBuffer bodies remain usable by the network process.
+  await page.addInitScript(() => {
+    const send = XMLHttpRequest.prototype.send;
+    const read = FileReader.prototype.readAsArrayBuffer;
+    (window as any).memoryUploadCounts = { reads: 0, sends: 0 };
+    FileReader.prototype.readAsArrayBuffer = function (blob) {
+      (window as any).memoryUploadCounts.reads++;
+      return read.call(this, blob);
+    };
+    XMLHttpRequest.prototype.send = function (body) {
+      if (body instanceof Blob)
+        throw new DOMException(
+          "File sandbox access denied",
+          "NotReadableError",
+        );
+      if (body instanceof ArrayBuffer)
+        (window as any).memoryUploadCounts.sends++;
+      return send.call(this, body);
+    };
+  });
+  const source = readFileSync("../../tests/fixtures/hevc-main10-12s.mov");
+  const size = 38_500_000;
+  const free = Buffer.alloc(8);
+  free.writeUInt32BE(size - source.length, 0);
+  free.write("free", 4);
+  const payload = Buffer.concat([
+    source,
+    free,
+    Buffer.alloc(size - source.length - free.length),
+  ]);
+  mkdirSync(testInfo.outputDir, { recursive: true });
+  const file = testInfo.outputPath("iphone-385mb.mov");
+  writeFileSync(file, payload);
+  await page.goto("/api/hassio_ingress/test-token/");
+  await page.getByRole("button", { name: "Übungsbibliothek" }).click();
+  await page.getByRole("button", { name: "Übung hinzufügen" }).click();
+  const name = `Datei vom Gerät ${testInfo.project.name}`;
+  await page.getByLabel("Übungsname").fill(name);
+  // A real filesystem path, not Playwright's in-memory file-buffer shortcut.
+  await page.locator("input[type=file]").setInputFiles(file);
+  await page.getByRole("button", { name: "Übung speichern" }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0, { timeout: 75_000 });
+  const counts = await page.evaluate(() => (window as any).memoryUploadCounts);
+  expect(counts.reads).toBe(Math.ceil(size / 262144));
+  expect(counts.sends).toBe(counts.reads);
+  await page
+    .getByRole("button", { name: `${name} ansehen`, exact: true })
+    .click();
+  const response = await page.request.get(
+    (await page.locator("video").getAttribute("src"))!,
+  );
+  expect(response.headers()["content-type"]).toBe("video/quicktime");
+  expect(Buffer.compare(await response.body(), payload)).toBe(0);
+});
+
+test("unreadable local video reports a file error before sending any video bytes", async ({
+  page,
+}, testInfo) => {
+  await page.addInitScript(() => {
+    FileReader.prototype.readAsArrayBuffer = function () {
+      throw new DOMException("File not locally available", "NotReadableError");
+    };
+  });
+  let blocksSent = 0;
+  page.on("request", (request) => {
+    if (
+      request.method() === "POST" &&
+      /\/api\/video-uploads\/[^/]+\?/.test(request.url())
+    )
+      blocksSent++;
+  });
+  await page.goto("/api/hassio_ingress/test-token/");
+  await page.getByRole("button", { name: "Übungsbibliothek" }).click();
+  await page.getByRole("button", { name: "Übung hinzufügen" }).click();
+  await page
+    .getByLabel("Übungsname")
+    .fill(`Dateifehler ${testInfo.project.name}`);
+  await page
+    .locator("input[type=file]")
+    .setInputFiles("../../tests/fixtures/hevc-main10-12s.mov");
+  await page.getByRole("button", { name: "Übung speichern" }).click();
+  await expect(page.getByRole("alert")).toContainText("DATEI_LESEN");
+  await expect(page.getByRole("alert")).toContainText("Dateien-App");
+  expect(blocksSent).toBe(0);
+});
+
+for (const sent of [false, true]) {
+  test(`timeout diagnostic distinguishes sent=${sent} at zero confirmed bytes`, async ({
+    page,
+  }, testInfo) => {
+    await page.addInitScript((sent) => {
+      XMLHttpRequest.prototype.send = function () {
+        // Controlled timeout, without waiting 45 seconds for each of three attempts.
+        if (sent) this.upload.dispatchEvent(new ProgressEvent("load"));
+        this.dispatchEvent(new ProgressEvent("timeout"));
+      };
+    }, sent);
+    await page.goto("/api/hassio_ingress/test-token/");
+    await page.getByRole("button", { name: "Übungsbibliothek" }).click();
+    await page.getByRole("button", { name: "Übung hinzufügen" }).click();
+    await page
+      .getByLabel("Übungsname")
+      .fill(`Zeitlimit ${sent} ${testInfo.project.name}`);
+    await page
+      .locator("input[type=file]")
+      .setInputFiles("../../tests/fixtures/hevc-main10-12s.mov");
+    await page.getByRole("button", { name: "Übung speichern" }).click();
+    await expect(page.getByRole("alert")).toContainText(
+      sent ? "UPLOAD_BESTAETIGUNG" : "UPLOAD_SENDEN",
+    );
+    await expect(page.getByRole("alert")).toContainText("0.00 von");
+    await expect(page.getByRole("alert")).not.toContainText("DATEI_LESEN");
+  });
+}

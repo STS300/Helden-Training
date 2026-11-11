@@ -14,7 +14,7 @@ Die letzte Eingabe desselben Profils und derselben Übung aus abgeschlossenen Ei
 
 MP4 und iPhone-MOV werden als Upload unterstützt. Für möglichst breite Wiedergabe-Kompatibilität wird H.264-Video mit AAC-Audio empfohlen. HEVC- und ProRes-Videos werden unverändert gespeichert und sind nur auf kompatiblen Geräten und Browsern abspielbar. Maximal 512 MB pro Video. Die App prüft Container und Größe, konvertiert jedoch keine Videos; der Browser muss den enthaltenen Codec unterstützen. Start- und Endsekunden erlauben einen Ausschnitt aus längeren Videos. Daten werden lokal gespeichert und nicht an externe Dienste übertragen.
 
-Seit Version 0.1.2 wird jedes Video in bestätigten Blöcken von 256 KiB übertragen. Das vermeidet große Einzelanfragen an Home Assistant oder vorgeschaltete Proxys. Ein unterbrochener Block wird bis zu dreimal versucht; beim erneuten Speichern mit derselben Dateiauswahl im noch geöffneten Dialog wird der bestätigte Upload fortgesetzt. Nach einem Neuladen der Oberfläche oder einer neuen Dateiauswahl beginnt die Übertragung neu. Bleibt die Verbindung zum geöffneten Browser erhalten, lassen sich bestätigte Teile auch nach einem App-Neustart weiterverwenden.
+Seit Version 0.1.2 wird jedes Video in bestätigten Blöcken von 256 KiB übertragen. Seit 0.1.3 wird jeder Block zuerst im Browser eingelesen und anschließend als Speicherpuffer per POST gesendet; dateibasierte Blob-Übertragung wird vermieden. Das vermeidet große Einzelanfragen an Home Assistant oder vorgeschaltete Proxys. Ein unterbrochener Block wird bis zu dreimal versucht; beim erneuten Speichern mit derselben Dateiauswahl im noch geöffneten Dialog wird der bestätigte Upload fortgesetzt. Nach einem Neuladen der Oberfläche oder einer neuen Dateiauswahl beginnt die Übertragung neu. Bleibt die Verbindung zum geöffneten Browser erhalten, lassen sich bestätigte Teile auch nach einem App-Neustart weiterverwenden.
 
 Unvollständige Dateien liegen getrennt in `/data/uploads/`, überschreiben kein vorhandenes Video und laufen nach 24 Stunden ab. Abgelaufene Uploads werden beim nächsten neuen Uploadstart bereinigt. Es gibt keine Begrenzung der Videospielzeit auf neun Sekunden; das Limit von 512 MB bezieht sich auf die Dateigröße. Die App konvertiert HEVC/ProRes nicht.
 
@@ -39,3 +39,14 @@ Der JSON-Export unter **Profile** enthält alle Profile, Übungen, Pläne und Tr
 ## Home Assistant Container
 
 Die beiliegende Compose-Datei dient dem lokalen Betrieb auf dem Docker-Host. Sie bindet den Port absichtlich nur an `127.0.0.1`; dieser Modus hat keine eigene Anmeldung. Für weitere Geräte ist ein authentifizierender HTTPS-Reverse-Proxy erforderlich. Eine Einbettung auf einem HA-Dashboard muss separat mit passenden URL- und Frame-Einstellungen eingerichtet werden. Die direkte Seitenleistenintegration per Ingress setzt HA OS voraus.
+
+## Upload bleibt bei 0 % stehen (Version 0.1.3)
+
+Die Anzeige unterscheidet „Videodatei auf diesem Gerät lesen“, „Datenblock senden“ und „auf Bestätigung von Home Assistant warten“. Der Prozentwert zählt bestätigte Bytes und zeigt auch Nachkommastellen an. Ein Upload kann bei 0 % stehen, wenn noch kein Block bestätigt wurde.
+
+- **DATEI_LESEN:** Der Browser kann die ausgewählte Datei nicht oder nicht vollständig lesen. Video vollständig in der Dateien-App lokal speichern und von dort neu auswählen. Das kann auch bei nicht verfügbaren Cloud-Originalen oder verweigertem Dateizugriff auftreten; die App kann die genaue Ursache nicht selbst ermitteln.
+- **UPLOAD_SENDEN / UPLOAD_NETZWERK:** Die Datei wurde eingelesen, aber der Übertragungsweg ist unterbrochen. Verbindung, Vordergrundbetrieb und Home-Assistant-Zugang prüfen.
+- **UPLOAD_BESTAETIGUNG:** Der Browser meldet den Block als gesendet, erhält aber nach 45 Sekunden keine Antwort. Das beweist noch nicht, dass Home Assistant den Block gespeichert hat. App-/Supervisor-Logs prüfen.
+- **UPLOAD_STEUERUNG:** Eine kleine Anfrage zum Starten, Fortsetzen oder Abschließen des Uploads bleibt über 30 Sekunden ohne Antwort.
+
+Im App-Log erscheinen Uploadstart, erster Blockeingang und erster bestätigter Block. Dateiname und Video werden nicht protokolliert. Wenn ein Problem bleibt, Versionsnummer, Dateigröße, Browser/iOS-Version, Zugang lokal/remote, den Fehlercode und die passenden App-Logzeilen nennen. Der WebKit-Browsertest ist kein Test auf dem konkreten iPhone der Benutzerin.

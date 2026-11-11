@@ -85,17 +85,19 @@ Für die UI-Entwicklung kann zusätzlich im Frontend-Verzeichnis `npm run dev` g
 cd helden_training/frontend
 npm ci
 npm run build
-npx playwright install chromium
+npx playwright install chromium webkit
 HELDEN_PYTHON="$(pwd)/../../.venv/bin/python" npm run test:e2e
 ```
 
 Die Browserprüfungen starten einen isolierten Server mit temporärer Datenbank und prüfen Desktop sowie Smartphone **unter einem simulierten Ingress-Pfad**. API-Prüfungen decken Profiltrennung, Satzwiederholungen, unveränderliche Snapshots, Uploadlimits, Video-Range-Requests, Neustart, parallelen Trainingsstart und Zugriffsschutz ab. GitHub Actions führt diese Prüfungen und Container-Builds für `linux/amd64` und `linux/arm64` aus.
 
-## Update auf 0.1.2
+## Update auf 0.1.3
 
 Vor dem Update ein vollständiges Home-Assistant-Backup erstellen. Bei Repository-Installation die App über den App-Store aktualisieren. Bei einer lokalen ZIP-Installation den Ordner `/addons/helden_training` durch den neuen Quellordner ersetzen und die lokale App neu bauen. Die App nicht deinstallieren oder ihr Datenverzeichnis löschen. Danach starten und die Weboberfläche vollständig neu laden, damit der neue Upload verwendet wird.
 
-Die Formaterweiterung in 0.1.1 allein beseitigte keine Größenlimits im Ingress. Der bisherige Upload verwendete `PUT`; [Home Assistant streamt mit `ingress_stream` jedoch nur `POST`](https://github.com/home-assistant/supervisor/blob/main/supervisor/api/ingress.py), sodass die vollständige Einzelanfrage eingelesen wurde. 0.1.2 überträgt Dateien deshalb in maximal 256 KiB großen HTTP-Anfragen; es gibt keine Neun-Sekunden-Spielzeitgrenze. Das Gesamtlimit bleibt bei 512 MB. Für HEVC/ProRes ist weiterhin ein kompatibler Browser erforderlich.
+Die Formaterweiterung in 0.1.1 allein beseitigte keine Größenlimits im Ingress. Der bisherige Upload verwendete `PUT`; [Home Assistant streamt mit `ingress_stream` jedoch nur `POST`](https://github.com/home-assistant/supervisor/blob/main/supervisor/api/ingress.py), sodass die vollständige Einzelanfrage eingelesen wurde. Ab 0.1.2 werden Dateien deshalb in maximal 256 KiB großen HTTP-Anfragen übertragen; es gibt keine Neun-Sekunden-Spielzeitgrenze. Das Gesamtlimit bleibt bei 512 MB. Für HEVC/ProRes ist weiterhin ein kompatibler Browser erforderlich.
+
+0.1.3 liest jeden Block vorab per FileReader in einen kleinen Speicherpuffer und sendet ihn per POST. Dadurch muss der Netzwerkprozess nicht direkt auf die ausgewählte Datei zugreifen. Dies ist ein Workaround für einen [dokumentierten WebKit-Dateizugriffsfehler](https://bugs.webkit.org/show_bug.cgi?id=319985), keine Bestätigung der Ursache auf einem konkreten Gerät. Die Oberfläche zeigt getrennte Uploadphasen und Fehlercodes; die App-Logs erfassen Beginn und ersten bestätigten Block. Neben Chromium wird jetzt iPhone-WebKit getestet, einschließlich einer diskbasierten 38,5-MB-HEVC-Datei und simulierter Dateisperre.
 
 ## Daten und Sicherung
 
@@ -105,7 +107,7 @@ Profile trennen Trainingswerte, aber keine Zugriffsrechte: Personen mit App-Zuga
 
 ## Weitere Ausbaustufen
 
-Diese Funktionen sind noch nicht Teil von 0.1.2:
+Diese Funktionen sind noch nicht Teil von 0.1.3:
 
 - MQTT-Anbindung für Licht, Lüfter, Musik und Trainingsereignisse.
 - Wochenkalender und Trainingsvorschläge nach Zeit und Geräten.

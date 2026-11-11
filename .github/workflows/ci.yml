@@ -25,7 +25,7 @@ jobs:
       - run: python -m pytest -q
       - run: npm ci && npm run format:check && npm run build
         working-directory: helden_training/frontend
-      - run: npx playwright install --with-deps chromium
+      - run: npx playwright install --with-deps chromium webkit
         working-directory: helden_training/frontend
       - run: npm run test:e2e
         working-directory: helden_training/frontend

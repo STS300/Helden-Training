@@ -853,7 +853,7 @@ function App() {
             </>
           )}
           <footer>
-            <Dumbbell size={14} /> HELDEN-TRAINING · 0.1.2{" "}
+            <Dumbbell size={14} /> HELDEN-TRAINING · 0.1.3{" "}
             <span>Dein Tempo. Dein Fortschritt.</span>
           </footer>
         </main>
@@ -1058,6 +1058,7 @@ function ExerciseEditor({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [progress, setProgress] = useState(0);
+  const [uploadStatus, setUploadStatus] = useState("");
   const [savedId, setSavedId] = useState(exercise?.id || 0);
   async function save(e: React.FormEvent) {
     e.preventDefault();
@@ -1072,7 +1073,7 @@ function ExerciseEditor({
         value,
       );
       setSavedId(result.id);
-      if (file) await upload(result.id, file, setProgress);
+      if (file) await upload(result.id, file, setProgress, setUploadStatus);
       await onSaved();
       onClose();
     } catch (e) {
@@ -1209,7 +1210,10 @@ function ExerciseEditor({
           />
         </label>
         {busy && file && (
-          <p role="status">Video wird hochgeladen: {progress} %</p>
+          <div role="status">
+            <p>Video-Upload: {progress.toLocaleString("de-DE")} % bestätigt</p>
+            <p>{uploadStatus}</p>
+          </div>
         )}
         <div className="form-actions">
           <button

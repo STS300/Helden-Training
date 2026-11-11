@@ -1,3 +1,11 @@
+# 0.1.3
+
+- Jeden Videoblock per FileReader explizit in einen kleinen ArrayBuffer einlesen; keine dateibasierten Blob-Objekte mehr an den Netzwerkprozess übergeben. Das umgeht den dokumentierten WebKit-Dateizugriffsfehler (https://bugs.webkit.org/show_bug.cgi?id=319985); die genaue Ursache auf dem Gerät der Benutzerin ist noch nicht bestätigt.
+- Blöcke per POST übertragen, damit auch Home Assistants eigentlicher Ingress-Streamingpfad genutzt wird. PUT bleibt für ältere Clients unterstützt.
+- Dateilesen, Senden und Warten auf Bestätigung getrennt anzeigen. Bestätigten Fortschritt mit Nachkommastelle statt pauschal 0 % anzeigen.
+- Unterschiedliche Fehlercodes für nicht lesbare lokale Dateien, Netzwerkfehler, fehlende Bestätigung und Upload-Steueranfragen. Im App-Log Uploadstart und ersten bestätigten Block protokollieren, ohne Dateinamen oder Videoinhalte.
+- Diskbasierte 38,5-MB-HEVC-Datei, simulierte WebKit-Dateisperre und nicht lesbare Dateien zusätzlich in der iPhone-WebKit-Testengine prüfen.
+
 # 0.1.2
 
 - Video-Uploads in bestätigte 256-KiB-Blöcke aufteilen, um Größenlimits einzelner HTTP-Anfragen im Home-Assistant-Ingress/Proxy zu umgehen.

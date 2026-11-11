@@ -13,7 +13,7 @@ from .media import MEDIA_TYPES, video_suffix
 
 CHUNK_BYTES = 256 * 1024
 UPLOAD_TTL = 24 * 60 * 60
-LOGGER = logging.getLogger(__name__)
+LOGGER = logging.getLogger('uvicorn.error')
 UPLOAD_SCHEMA = '''
 CREATE TABLE IF NOT EXISTS video_uploads (
  id TEXT PRIMARY KEY, exercise_id INTEGER NOT NULL REFERENCES exercises(id),
@@ -61,6 +61,7 @@ def register_uploads(app, db, data: Path, get, max_upload):
                          (upload_id, exercise_id, body.size, body.media_type, time.time()))
             folder.mkdir(exist_ok=True)
             (folder / (upload_id + '.part')).touch(exist_ok=False)
+            LOGGER.info('Video upload created: %s (%d bytes)', upload_id, body.size)
             return status(find(conn, upload_id))
 
     @app.get('/api/video-uploads/{upload_id}')
@@ -96,11 +97,14 @@ def register_uploads(app, db, data: Path, get, max_upload):
                          (offset + len(body), time.time(), upload_id))
             return status(find(conn, upload_id))
 
+    @app.post('/api/video-uploads/{upload_id}')
     @app.put('/api/video-uploads/{upload_id}')
     async def put_chunk(upload_id: str, request: Request, offset: int = Query(ge=0)):
         # Validate before reading, then recheck under the write lock.
         with db() as conn:
             find(conn, upload_id)
+        if offset == 0:
+            LOGGER.info('Video upload first block request: %s (%s)', upload_id, request.method)
         body = bytearray()
         async for chunk in request.stream():
             if len(body) + len(chunk) > CHUNK_BYTES:
@@ -108,7 +112,10 @@ def register_uploads(app, db, data: Path, get, max_upload):
             body.extend(chunk)
         if not body:
             raise HTTPException(422, 'Leerer Datenblock.')
-        return await run_in_threadpool(append, upload_id, offset, bytes(body))
+        result = await run_in_threadpool(append, upload_id, offset, bytes(body))
+        if offset == 0:
+            LOGGER.info('Video upload first block confirmed: %s (%d bytes)', upload_id, result['offset'])
+        return result
 
     @app.post('/api/video-uploads/{upload_id}/finish')
     def finish(upload_id: str):

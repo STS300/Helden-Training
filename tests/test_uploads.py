@@ -155,3 +155,14 @@ def test_finish_recovers_file_published_before_database_commit(tmp_path):
         assert finish(client, upload).json()['completed'] == 1
         assert not partial.exists()
         assert client.get(f"/api/exercises/{exercise['id']}/video").content == MOV
+
+
+def test_post_chunk_upload_uses_streaming_compatible_method(client):
+    _, exercise, _ = setup_training(client)
+    upload = begin(client, exercise, len(MOV))
+    result = client.post(f"/api/video-uploads/{upload['id']}?offset=0", content=MOV,
+                         headers={'Content-Type': 'application/octet-stream'})
+    assert result.status_code == 200
+    assert result.json()['offset'] == len(MOV)
+    assert finish(client, upload).status_code == 200
+    assert client.get(f"/api/exercises/{exercise['id']}/video").content == MOV
