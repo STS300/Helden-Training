@@ -526,3 +526,124 @@ test("Local media can be selected and streamed through Ingress without upload", 
   );
   expect(uploads).toBe(0);
 });
+
+test("Muscle map assignments persist and filter plan exercises", async ({
+  page,
+}, testInfo) => {
+  await page.goto("/api/hassio_ingress/test-token/");
+  await page.getByRole("button", { name: "Übungsbibliothek" }).click();
+  await page.getByRole("button", { name: "Übung hinzufügen" }).click();
+  const name = `Muskeltest ${testInfo.project.name}`;
+  await page.getByLabel("Übungsname").fill(name);
+  const assignment = page.getByRole("group", {
+    name: "Muskelzuordnung der Übung",
+    exact: true,
+  });
+  await assignment
+    .getByRole("button", { name: "Brust (Vorderseite)", exact: true })
+    .click({ position: { x: 10, y: 12 } });
+  await assignment
+    .getByRole("button", { name: "Trizeps", exact: true })
+    .click();
+  await page.getByRole("button", { name: "Übung speichern" }).click();
+  const card = page.locator(".exercise-card").filter({ hasText: name });
+  await card.getByRole("button", { name: "Bearbeiten", exact: true }).click();
+  await expect(
+    assignment.getByRole("button", { name: "Brust", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await page.screenshot({
+    path: `test-results/muscles-${testInfo.project.name}.png`,
+    fullPage: true,
+  });
+  await assignment
+    .getByRole("button", { name: "Brust (Vorderseite)", exact: true })
+    .focus();
+  await page.keyboard.press("Enter");
+  await assignment
+    .getByRole("button", { name: "Quadrizeps", exact: true })
+    .click();
+  await page.getByRole("button", { name: "Übung speichern" }).click();
+  await page.reload();
+  await page
+    .getByRole("button", { name: "Trainingspläne", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Plan erstellen", exact: true })
+    .click();
+  await page
+    .getByLabel("Name des Plans")
+    .fill(`Muskelplan ${testInfo.project.name}`);
+  const filter = page.getByRole("group", {
+    name: "Übungen nach Muskelgruppen auswählen",
+    exact: true,
+  });
+  await filter.getByRole("button", { name: "Brust", exact: true }).click();
+  const choices = page.getByRole("combobox", { name: "Übung hinzufügen" });
+  await expect(choices.locator("option").filter({ hasText: name })).toHaveCount(
+    0,
+  );
+  await filter
+    .getByRole("button", { name: "Muskelauswahl zurücksetzen" })
+    .click();
+  await filter
+    .getByRole("button", { name: "Quadrizeps (Vorderseite)", exact: true })
+    .click({ position: { x: 10, y: 12 } });
+  await expect(choices.locator("option").filter({ hasText: name })).toHaveCount(
+    1,
+  );
+  await choices.selectOption({ label: `${name} · Ganzer Körper` });
+  await page.getByRole("dialog").locator(".add-exercise button").click();
+  await page.getByRole("button", { name: "Plan speichern" }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(
+    page
+      .locator(".plan-card")
+      .filter({ hasText: `Muskelplan ${testInfo.project.name}` }),
+  ).toBeVisible();
+});
+
+test("Thumbnail displays in exercise overview and falls back on failure", async ({
+  page,
+}, testInfo) => {
+  // The endpoint's extraction/cache is verified separately with a real HEVC fixture.
+  await page.route("**/api/exercises/*/thumbnail?*", (route) =>
+    route.fulfill({
+      contentType: "image/svg+xml",
+      body: '<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360"><rect width="640" height="360" fill="green"/></svg>',
+    }),
+  );
+  await page.goto("/api/hassio_ingress/test-token/");
+  await page.getByRole("button", { name: "Übungsbibliothek" }).click();
+  await page.getByRole("button", { name: "Übung hinzufügen" }).click();
+  const name = `Standbild ${testInfo.project.name}`;
+  await page.getByLabel("Übungsname").fill(name);
+  await page
+    .getByRole("button", { name: "Lokales Video auswählen", exact: true })
+    .click();
+  const picker = page.getByRole("region", { name: "Lokale Videos auswählen" });
+  await picker.getByRole("button", { name: "Beine Öffnen" }).click();
+  await picker.getByRole("button", { name: /Kniebeuge.MOV/ }).click();
+  await page.getByRole("button", { name: "Übung speichern" }).click();
+  const card = page.locator(".exercise-card").filter({ hasText: name });
+  const image = card.getByRole("img", { name: `Standbild: ${name}` });
+  await image.scrollIntoViewIfNeeded();
+  await expect(image).toBeVisible();
+  await expect
+    .poll(() => image.evaluate((el: HTMLImageElement) => el.naturalWidth))
+    .toBe(640);
+  await page.screenshot({
+    path: `test-results/overview-${testInfo.project.name}.png`,
+    fullPage: true,
+  });
+  await page.unroute("**/api/exercises/*/thumbnail?*");
+  await page.route("**/api/exercises/*/thumbnail?*", (route) =>
+    route.fulfill({ status: 422, body: "unavailable" }),
+  );
+  await page.reload();
+  await page.getByRole("button", { name: "Übungsbibliothek" }).click();
+  await card.scrollIntoViewIfNeeded();
+  await expect(card.locator(".video-thumbnail")).toHaveCount(0);
+  await expect(
+    card.getByRole("button", { name: `${name} ansehen`, exact: true }),
+  ).toBeVisible();
+});

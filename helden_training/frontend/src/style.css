@@ -1643,3 +1643,79 @@ video {
   color: var(--muted);
   margin-top: 3px;
 }
+.video-thumbnail {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.video-cover .cover-label,
+.video-cover .play-badge {
+  z-index: 1;
+}
+.video-cover:has(.video-thumbnail) .cover-label {
+  background: rgba(0, 0, 0, 0.65);
+  color: white;
+  padding: 4px 8px;
+  border-radius: 6px;
+}
+.muscle-picker {
+  margin: 16px 0;
+  min-width: 0;
+}
+.body-views {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  margin: 12px 0;
+}
+.body-views > div {
+  text-align: center;
+  width: 45%;
+  max-width: 190px;
+}
+.body-views svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.body-silhouette {
+  fill: #e2e7e2;
+  stroke: #a0aca2;
+  stroke-width: 1;
+}
+.muscle-region {
+  fill: #9daea2;
+  stroke: #fff;
+  stroke-width: 1;
+  cursor: pointer;
+}
+.muscle-region:hover,
+.muscle-region:focus {
+  fill: #789147;
+  outline: none;
+  stroke: #253316;
+  stroke-width: 2;
+}
+.muscle-region.selected {
+  fill: #537a20;
+}
+.muscle-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.muscle-options button {
+  padding: 9px 12px;
+  border: 1px solid #b8c3b5;
+  border-radius: 20px;
+  background: transparent;
+  color: inherit;
+  font-size: 13px;
+}
+.muscle-options button[aria-pressed="true"] {
+  background: #d9f36a;
+  color: #243015;
+  border-color: #537a20;
+}

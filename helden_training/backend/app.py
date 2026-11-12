@@ -1,4 +1,5 @@
 """Local-first training API. Production access is restricted to HA Ingress."""
+import hashlib
 import json
 import os
 import sqlite3
@@ -18,6 +19,7 @@ from pydantic import BaseModel, Field, model_validator, field_validator
 from .media import MEDIA_TYPES, video_suffix
 from .uploads import UPLOAD_SCHEMA, register_uploads
 from .local_media import LocalMedia
+from .thumbnails import Thumbnails
 
 CATEGORIES = ['Ganzer Körper', 'Oberkörper', 'Unterkörper', 'Beine', 'Push', 'Pull']
 
@@ -148,6 +150,7 @@ def create_app(data_dir=None, static_dir=None, ingress_only=None, media_dir=None
     data = Path(data_dir or os.getenv('DATA_DIR', './data'))
     static = Path(static_dir or Path(__file__).parent.parent / 'frontend' / 'dist')
     restricted = ingress_only if ingress_only is not None else os.getenv('INGRESS_ONLY', 'true').lower() == 'true'
+    thumbnails = Thumbnails(data / 'thumbnails')
     max_upload = int(os.getenv('MAX_UPLOAD_MB', '512')) * 1024 * 1024
     local_media = LocalMedia(media_dir or os.getenv('MEDIA_DIR', '/media/helden-training'))
 
@@ -181,7 +184,7 @@ def create_app(data_dir=None, static_dir=None, ingress_only=None, media_dir=None
             partial.unlink(missing_ok=True)
         yield
 
-    app = FastAPI(title='Helden-Training', version='0.1.5', lifespan=lifespan,
+    app = FastAPI(title='Helden-Training', version='0.1.6', lifespan=lifespan,
                   docs_url=None, redoc_url=None, openapi_url=None)
 
     @app.exception_handler(RequestValidationError)
@@ -217,7 +220,15 @@ def create_app(data_dir=None, static_dir=None, ingress_only=None, media_dir=None
     def exercise_dict(row):
         result = dict(row)
         result['categories'] = json.loads(result['categories'])
-        result['has_uploaded_video'] = bool(result.pop('video'))
+        filename = result.pop('video')
+        result['has_uploaded_video'] = bool(filename)
+        try:
+            source = local_media.resolve(result['media_path']) if result.get('media_path') else data / 'videos' / (filename or '')
+            stat = source.stat() if filename or result.get('media_path') else None
+            revision = f"{source}:{stat.st_size}:{stat.st_mtime_ns}:{result['start_seconds']}" if stat else ''
+        except (HTTPException, OSError):
+            revision = ''
+        result['thumbnail_version'] = hashlib.sha256(revision.encode()).hexdigest()[:20]
         result['has_video'] = result['has_uploaded_video'] or bool(result.get('media_path'))
         return result
 
@@ -255,7 +266,7 @@ def create_app(data_dir=None, static_dir=None, ingress_only=None, media_dir=None
 
     @app.get('/api/health')
     def health():
-        return {'status': 'ok', 'version': '0.1.5'}
+        return {'status': 'ok', 'version': '0.1.6'}
 
     @app.get('/api/local-media')
     def browse_media(folder: str = ''):
@@ -372,6 +383,18 @@ def create_app(data_dir=None, static_dir=None, ingress_only=None, media_dir=None
             partial.unlink(missing_ok=True)
             final.unlink(missing_ok=True)
             raise
+
+    @app.get('/api/exercises/{identifier}/thumbnail')
+    def exercise_thumbnail(identifier: int):
+        with db() as conn:
+            exercise = get(conn, 'exercises', identifier)
+        if exercise.get('media_path'):
+            source = local_media.resolve(exercise['media_path'])
+        elif exercise.get('video') and (data / 'videos' / exercise['video']).is_file():
+            source = data / 'videos' / exercise['video']
+        else:
+            raise HTTPException(404, 'Kein lokales Video vorhanden.')
+        return thumbnails.image(source, exercise['start_seconds'])
 
     @app.api_route('/api/exercises/{identifier}/video', methods=['GET', 'HEAD'])
     def exercise_video(identifier: int):

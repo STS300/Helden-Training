@@ -10,6 +10,22 @@
 
 Die letzte Eingabe desselben Profils und derselben Übung aus abgeschlossenen Einheiten wird als Ausgangswert vorgeschlagen. Null kg steht beispielsweise für eine Übung mit dem eigenen Körpergewicht; das Körpergewicht wird nicht zum Volumen addiert.
 
+## Muskelzuordnung und Planung mit Körpergrafik (ab 0.1.6)
+
+Unter **Übungsbibliothek → Bearbeiten → Muskelzuordnung der Übung** Muskelgruppen in der Vorder-/Rückansicht oder über die beschrifteten Schaltflächen auswählen. Mehrere Gruppen sind möglich; erneutes Antippen entfernt die Zuordnung. Danach **Übung speichern**. Die Grafik ist schematisch; kleine oder tiefer liegende Muskelgruppen werden als Trainingsregion dargestellt.
+
+21 Gruppen stehen zur Auswahl: Brust, Schultern, Bizeps, Trizeps, Unterarme, Bauch, seitlicher Bauch, Trapez/Nacken, Latissimus, mittlerer/unterer Rücken, Gesäß, Quadrizeps, Beinbeuger, Adduktoren, Abduktoren, Waden, Schienbein, Hüftbeuger, Rotatorenmanschette und Sägemuskel. Links und rechts werden gemeinsam ausgewählt.
+
+Bestehende freie Muskelangaben bleiben erhalten. Die Auswahl wird zusammen mit diesen Angaben im bisherigen Muskelfeld gespeichert und im Export sowie in Session-Snapshots übernommen. Alte Begriffe wie „Oberschenkel“ werden nicht automatisch einer konkreteren Gruppe zugeordnet: die passenden Schaltflächen einmalig ergänzen. Freitext kann im Feld darüber weiterhin bearbeitet werden.
+
+Unter **Trainingspläne → Plan erstellen/Bearbeiten → Übungen nach Muskelgruppen auswählen** dieselbe Grafik als Filter verwenden. Die Bibliotheksauswahl zeigt Übungen mit mindestens einer gewählten Gruppe. Ohne Auswahl werden alle Übungen angeboten. Übungen einzeln hinzufügen, Reihenfolge und Satzvorgaben festlegen und den Plan speichern. Die Körperauswahl ist ein Suchfilter und wird nicht als eigener Planparameter gespeichert; die hinzugefügten Übungen werden gespeichert. Ein neuer Filter entfernt keine bereits hinzugefügten Übungen. Ohne passende Übungen die Muskelzuordnung zuerst in der Bibliothek bearbeiten.
+
+## Standbilder in der Übungsübersicht (ab 0.1.6)
+
+Bei zugeordneten lokalen oder hochgeladenen Videos zeigt die Übungsübersicht automatisch ein Standbild am eingestellten **Video-Start**. Die Erstellung erfolgt lokal mit FFmpeg, auch bei unterstützten HEVC-MOV-Dateien; das Original bleibt unverändert. Das erste Laden kann auf kleinen Geräten etwas dauern. Bei fehlender Datei oder nicht lesbarem Video bleibt das bisherige Symbol sichtbar. Die Videowiedergabe benötigt unabhängig vom Standbild weiterhin einen kompatiblen Browser.
+
+Die App hält höchstens 200 erzeugte Bilder als erneuerbaren Cache in `/data/thumbnails`. Nach einer Änderung an Datei oder Startzeit wird das Bild beim nächsten Laden der Bibliothek neu erzeugt. Reine OneDrive-Freigabelinks bieten ohne Microsoft-Anbindung keinen sicheren Zugriff auf die Videodatei und behalten deshalb den Platzhalter. Für ein automatisches Standbild das Video lokal auf Home Assistant zuordnen.
+
 ## Lokale Videos direkt in der App abspielen (ab 0.1.5)
 
 Die App kann Videos direkt aus **`/media/helden-training`** lesen. Dabei entfallen Browser-Upload und OneDrive-Einbettung. Eine Microsoft-Anmeldung oder App-ID ist nicht erforderlich.

@@ -1,3 +1,11 @@
+# 0.1.6
+
+- Automatische lokale Standbilder für zugeordnete Medien und Uploads in der Übungsübersicht; Ausschnitt am Video-Start, begrenzter Cache, Platzhalter bei Fehlern.
+- FFmpeg in das App-Image aufnehmen; HEVC-Standbild ohne Änderung des Originals. Keine externen Medienabrufe über OneDrive-Links.
+- Interaktive Körpergrafik mit Vorder-/Rückansicht und 21 Trainingsmuskelgruppen; Maus, Touch und Tastatur sowie beschriftete Mehrfachauswahl.
+- Muskelzuordnung je Übung bearbeiten; bestehende Freitextangaben bleiben erhalten.
+- Planerstellung nach einer oder mehreren Muskelgruppen filtern und passende Übungen hinzufügen. Bereits gewählte Planübungen bleiben erhalten.
+
 # 0.1.5
 
 - Lokale Videos aus `/media/helden-training` mit Ordnerauswahl direkt Übungen zuordnen und in Vorschau und Training abspielen; kein Browser-Upload oder OneDrive-Login nötig.

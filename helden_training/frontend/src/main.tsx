@@ -1,3 +1,5 @@
+import { MusclePicker, parseMuscles } from "./MusclePicker";
+import { VideoThumbnail } from "./VideoThumbnail";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
@@ -561,7 +563,10 @@ function App() {
                           aria-label={`${e.name} ansehen`}
                           onClick={() => setPreview(e)}
                         >
-                          <Dumbbell size={48} strokeWidth={1.2} />
+                          <VideoThumbnail
+                            key={`${e.id}:${e.thumbnail_version}`}
+                            exercise={e}
+                          />
                           <span className="play-badge">
                             {e.has_video || e.onedrive_url ? (
                               <Play size={18} />
@@ -881,7 +886,7 @@ function App() {
             </>
           )}
           <footer>
-            <Dumbbell size={14} /> HELDEN-TRAINING · 0.1.5{" "}
+            <Dumbbell size={14} /> HELDEN-TRAINING · 0.1.6{" "}
             <span>Dein Tempo. Dein Fortschritt.</span>
           </footer>
         </main>
@@ -1197,7 +1202,7 @@ function ExerciseEditor({
             />
           </label>
           <label>
-            Muskelgruppen
+            Weitere Muskelangaben / bisherige Zuordnung
             <input
               maxLength={300}
               value={value.muscles}
@@ -1206,6 +1211,13 @@ function ExerciseEditor({
             />
           </label>
         </div>
+        <MusclePicker
+          label="Muskelzuordnung der Übung"
+          value={parseMuscles(value.muscles)}
+          onChange={(groups) =>
+            setValue({ ...value, muscles: groups.join(", ") })
+          }
+        />
         <label>
           Lokales Video auf Home Assistant
           <input
@@ -1287,7 +1299,7 @@ function ExerciseEditor({
           />
         </label>
         <p className="muted">
-          Start- und Endzeiten gelten nur für hochgeladene Videos, nicht für den
+          Start- und Endzeiten gelten für interne Videos, nicht für den
           OneDrive-Player. MOV-Dateien werden unverändert gespeichert. Die
           Wiedergabe von HEVC/ProRes hängt vom Gerät und Browser ab.
         </p>
@@ -1373,6 +1385,13 @@ function PlanEditor({
   const [category, setCategory] = useState(plan?.category || categories[0]);
   const [items, setItems] = useState<PlanItem[]>(plan?.items || []);
   const [choice, setChoice] = useState(0);
+  const [targetMuscles, setTargetMuscles] = useState<string[]>([]);
+  const matchingExercises = exercises.filter(
+    (e) =>
+      !targetMuscles.length ||
+      parseMuscles(e.muscles).some((m) => targetMuscles.includes(m)),
+  );
+
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   function update(index: number, key: keyof PlanItem, value: number) {
@@ -1437,6 +1456,26 @@ function PlanEditor({
             ))}
           </select>
         </label>
+        <MusclePicker
+          label="Übungen nach Muskelgruppen auswählen"
+          value={targetMuscles}
+          onChange={(groups) => {
+            setTargetMuscles(groups);
+            setChoice(0);
+          }}
+        />
+        <p className="notice">
+          {matchingExercises.length} passende Übungen. Bei Mehrfachauswahl
+          genügt eine übereinstimmende Muskelgruppe. Bereits hinzugefügte
+          Übungen bleiben im Plan. Die Zuordnung bearbeitest du in der
+          Übungsbibliothek.
+        </p>
+        {targetMuscles.length > 0 && !matchingExercises.length && (
+          <p role="status">
+            Keine passende Übung. Weise Übungen in der Bibliothek die gewählten
+            Muskelgruppen zu oder ändere die Auswahl.
+          </p>
+        )}
         <div className="plan-builder">
           {items.map((item, index) => (
             <div className="builder-item" key={index}>
@@ -1515,7 +1554,7 @@ function PlanEditor({
             onChange={(e) => setChoice(+e.target.value)}
           >
             <option value="0">Übung aus Bibliothek wählen …</option>
-            {exercises.map((e) => (
+            {matchingExercises.map((e) => (
               <option key={e.id} value={e.id}>
                 {e.name} · {e.categories.join(", ")}
               </option>

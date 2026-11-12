@@ -7,6 +7,8 @@ Eine lokale Krafttrainings-App für **Home Assistant OS**. Eigene Übungsvideos,
 ## Funktionen der ersten Version
 
 - Lokale Videos aus `/media/helden-training` auswählen und direkt in der App abspielen; Dateien zuvor etwa per Samba auf Home Assistant kopieren.
+- Video-Standbilder in der Übungsübersicht für lokale Medien und Uploads.
+- Interaktive Körpergrafik mit 21 Muskelgruppen: Übungen zuweisen und bei der Planerstellung passende Übungen auswählen.
 - Profile anlegen, umbenennen, farblich kennzeichnen und archivieren.
 - OneDrive-Freigabelink je Übung speichern und das Video in einem neuen Tab aus Bibliothek oder Training öffnen; kein Video-Upload erforderlich.
 - Eigene MP4- und MOV-Videos in kleinen bestätigten Blöcken hochladen, ersetzen und mit Start-/Endzeit versehen. Unterbrochene Blöcke werden wiederholt; ein erneuter Versuch im selben Dialog setzt bestätigte Teile fort.
@@ -67,7 +69,7 @@ Dieser Modus deaktiviert den Ingress-IP-Filter und bietet **keine eigene Anmeldu
 
 ### Entwicklung ohne Docker
 
-Voraussetzungen: Python 3.13 und Node.js 22.
+Voraussetzungen: Python 3.13, Node.js 22 und FFmpeg für Video-Standbilder.
 
 ```sh
 python3.13 -m venv .venv
