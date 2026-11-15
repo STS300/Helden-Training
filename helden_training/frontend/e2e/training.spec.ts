@@ -577,6 +577,9 @@ test("Muscle map assignments persist and filter plan exercises", async ({
     name: "Übungen nach Muskelgruppen auswählen",
     exact: true,
   });
+  await filter
+    .getByRole("button", { name: "Muskelauswahl zurücksetzen" })
+    .click();
   await filter.getByRole("button", { name: "Brust", exact: true }).click();
   const choices = page.getByRole("combobox", { name: "Übung hinzufügen" });
   await expect(choices.locator("option").filter({ hasText: name })).toHaveCount(
@@ -646,4 +649,191 @@ test("Thumbnail displays in exercise overview and falls back on failure", async 
   await expect(
     card.getByRole("button", { name: `${name} ansehen`, exact: true }),
   ).toBeVisible();
+});
+
+test("Library views, editable numbers, category templates and history corrections", async ({
+  page,
+}, testInfo) => {
+  const suffix = testInfo.project.name;
+  const headers = { "X-Helden-Request": "1" };
+  const profile = await (
+    await page.request.post("/api/profiles", {
+      headers,
+      data: { name: `Update ${suffix}` },
+    })
+  ).json();
+  const exercise = await (
+    await page.request.post("/api/exercises", {
+      headers,
+      data: {
+        name: `Bankdrücken ${suffix}`,
+        categories: ["Push"],
+        muscles: "Brust, Trizeps",
+        equipment: "Hantelbank",
+      },
+    })
+  ).json();
+  await page.goto("/api/hassio_ingress/test-token/");
+  await page
+    .getByRole("combobox", { name: "Aktives Trainingsprofil" })
+    .selectOption(String(profile.id));
+  await page.getByRole("button", { name: "Übungsbibliothek" }).click();
+  await page.getByRole("button", { name: "Liste", exact: true }).click();
+  const card = page
+    .locator(".exercise-list .exercise-card")
+    .filter({ hasText: exercise.name });
+  await expect(card).toContainText("Hantelbank");
+  await page.screenshot({
+    path: `test-results/library-list-${suffix}.png`,
+    fullPage: true,
+  });
+  await expect(
+    card.getByRole("button", { name: "Bearbeiten", exact: true }),
+  ).toBeVisible();
+  await page.reload();
+  await page.getByRole("button", { name: "Übungsbibliothek" }).click();
+  await expect(
+    page.getByRole("button", { name: "Liste", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await page.getByRole("button", { name: "Kacheln", exact: true }).click();
+  await expect(
+    page.locator(".cards .exercise-card").filter({ hasText: exercise.name }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Trainingspläne", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Plan erstellen", exact: true })
+    .click();
+  const planName = `Korrekturplan ${suffix}`;
+  await page.getByLabel("Name des Plans").fill(planName);
+  await page
+    .getByRole("combobox", { name: "Kategorie", exact: true })
+    .selectOption("Oberkörper");
+  const muscles = page.getByRole("group", {
+    name: "Übungen nach Muskelgruppen auswählen",
+    exact: true,
+  });
+  await expect(
+    muscles.getByRole("button", { name: "Brust", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await expect(
+    muscles.getByRole("button", { name: "Quadrizeps", exact: true }),
+  ).toHaveAttribute("aria-pressed", "false");
+  await muscles.getByRole("button", { name: "Bizeps", exact: true }).click();
+  page.once("dialog", (dialog) => dialog.dismiss());
+  await page
+    .getByRole("combobox", { name: "Kategorie", exact: true })
+    .selectOption("Unterkörper");
+  await expect(
+    page.getByRole("combobox", { name: "Kategorie", exact: true }),
+  ).toHaveValue("Oberkörper");
+  await page
+    .getByRole("combobox", { name: "Übung hinzufügen" })
+    .selectOption(String(exercise.id));
+  await page.getByRole("dialog").locator(".add-exercise button").click();
+  const weight = page.getByLabel("Gewicht (kg)", { exact: true });
+  await weight.fill("");
+  await expect(weight).toHaveValue("");
+  await page.getByRole("button", { name: "Plan speichern" }).click();
+  await expect(page.getByRole("dialog")).toBeVisible();
+  await weight.fill("12,5");
+  await page.getByLabel("Sätze", { exact: true }).fill("");
+  await expect(page.getByLabel("Sätze", { exact: true })).toHaveValue("");
+  await page.getByLabel("Sätze", { exact: true }).fill("2");
+  await page.getByLabel("Pause (Sek.)", { exact: true }).fill("");
+  await expect(page.getByLabel("Pause (Sek.)", { exact: true })).toHaveValue(
+    "",
+  );
+  await page.getByLabel("Pause (Sek.)", { exact: true }).fill("0");
+  await page.getByRole("button", { name: "Plan speichern" }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  const planCard = page.locator(".plan-card").filter({ hasText: planName });
+  await planCard
+    .getByRole("button", { name: "Bearbeiten", exact: true })
+    .click();
+  await expect(
+    muscles.getByRole("button", { name: "Bizeps", exact: true }),
+  ).toHaveAttribute("aria-pressed", "false");
+  await expect(weight).toHaveValue("12.5");
+  await page
+    .getByRole("button", { name: "Kategorieauswahl wiederherstellen" })
+    .click();
+  await expect(
+    muscles.getByRole("button", { name: "Bizeps", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await muscles.getByRole("button", { name: "Bizeps", exact: true }).click();
+  page.once("dialog", (dialog) => dialog.accept());
+  await page
+    .getByRole("combobox", { name: "Kategorie", exact: true })
+    .selectOption("Unterkörper");
+  await expect(
+    muscles.getByRole("button", { name: "Quadrizeps", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await expect(
+    muscles.getByRole("button", { name: "Brust", exact: true }),
+  ).toHaveAttribute("aria-pressed", "false");
+  await expect(page.locator(".builder-item")).toHaveCount(1);
+  await page.getByRole("button", { name: "Abbrechen", exact: true }).click();
+  const plans = await (await page.request.get("/api/plans")).json();
+  const plan = plans.find((p: { name: string }) => p.name === planName);
+  const session = await (
+    await page.request.post("/api/sessions", {
+      headers,
+      data: { profile_id: profile.id, plan_id: plan.id },
+    })
+  ).json();
+  await page.request.put(
+    `/api/sessions/${session.id}/items/${session.items[0].id}/sets/1`,
+    { headers, data: { weight: 12.5, reps: 10, notes: "Vorher" } },
+  );
+  await page.request.post(`/api/sessions/${session.id}/finish`, { headers });
+  await page.reload();
+  await page.getByRole("button", { name: "Mein Verlauf", exact: true }).click();
+  let row = page.locator(".history-entry").filter({ hasText: planName });
+  await row
+    .getByRole("button", { name: "Training bearbeiten", exact: true })
+    .click();
+  await page
+    .getByLabel(`Gewicht ${exercise.name} Satz 1`, { exact: true })
+    .fill("20");
+  await page
+    .getByLabel(`Notiz ${exercise.name} Satz 1`, { exact: true })
+    .fill("Korrigiert");
+  await page.getByLabel("Trainingsname").fill(`Bearbeitet ${suffix}`);
+  await page.screenshot({
+    path: `test-results/history-edit-${suffix}.png`,
+    fullPage: true,
+  });
+  await page.getByRole("button", { name: "Änderungen speichern" }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  row = page
+    .locator(".history-entry")
+    .filter({ hasText: `Bearbeitet ${suffix}` });
+  await expect(row).toContainText("200 kg Volumen");
+  await row
+    .getByRole("button", { name: "Training bearbeiten", exact: true })
+    .click();
+  await expect(
+    page.getByLabel(`Notiz ${exercise.name} Satz 1`, { exact: true }),
+  ).toHaveValue("Korrigiert");
+  await page.getByRole("button", { name: "Fehlenden Satz ergänzen" }).click();
+  await page
+    .getByRole("button", { name: "Satz 1 entfernen", exact: true })
+    .click();
+  await page.getByRole("button", { name: "Änderungen speichern" }).click();
+  await expect(row).toContainText("125 kg Volumen");
+  page.once("dialog", (dialog) => dialog.dismiss());
+  await row
+    .getByRole("button", { name: "Training löschen", exact: true })
+    .click();
+  await expect(row).toBeVisible();
+  page.once("dialog", (dialog) => dialog.accept());
+  await row
+    .getByRole("button", { name: "Training löschen", exact: true })
+    .click();
+  await expect(row).toHaveCount(0);
+  await page.reload();
+  await page.getByRole("button", { name: "Mein Verlauf", exact: true }).click();
+  await expect(page.locator(".history-entry")).toHaveCount(0);
 });

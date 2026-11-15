@@ -37,6 +37,7 @@ export interface PlanItem {
   exercise_archived?: number;
 }
 export interface Plan {
+  target_muscles?: string[] | null;
   id: number;
   name: string;
   category: string;

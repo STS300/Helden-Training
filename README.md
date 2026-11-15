@@ -9,6 +9,8 @@ Eine lokale Krafttrainings-App für **Home Assistant OS**. Eigene Übungsvideos,
 - Lokale Videos aus `/media/helden-training` auswählen und direkt in der App abspielen; Dateien zuvor etwa per Samba auf Home Assistant kopieren.
 - Video-Standbilder in der Übungsübersicht für lokale Medien und Uploads.
 - Interaktive Körpergrafik mit 21 Muskelgruppen: Übungen zuweisen und bei der Planerstellung passende Übungen auswählen.
+- Kachel- oder Listenansicht, Kategorievorlagen für Muskelgruppen und mit dem Plan gespeicherte Muskelauswahl.
+- Trainings im Verlauf korrigieren oder nach Bestätigung löschen.
 - Profile anlegen, umbenennen, farblich kennzeichnen und archivieren.
 - OneDrive-Freigabelink je Übung speichern und das Video in einem neuen Tab aus Bibliothek oder Training öffnen; kein Video-Upload erforderlich.
 - Eigene MP4- und MOV-Videos in kleinen bestätigten Blöcken hochladen, ersetzen und mit Start-/Endzeit versehen. Unterbrochene Blöcke werden wiederholt; ein erneuter Versuch im selben Dialog setzt bestätigte Teile fort.

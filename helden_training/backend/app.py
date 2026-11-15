@@ -88,6 +88,14 @@ class Plan(BaseModel):
     name: str = Field(min_length=1, max_length=120)
     category: str
     items: List[PlanItem] = Field(min_length=1, max_length=60)
+    target_muscles: Optional[List[str]] = Field(default=None, max_length=40)
+
+    @field_validator("target_muscles")
+    @classmethod
+    def validate_targets(cls, value):
+        if value is not None and any(not v.strip() or len(v) > 60 for v in value):
+            raise ValueError("Muskelgruppen ungültig.")
+        return list(dict.fromkeys(value)) if value is not None else None
 
 
 class StartSession(BaseModel):
@@ -99,6 +107,31 @@ class SetLog(BaseModel):
     weight: float = Field(ge=0, le=2000)
     reps: int = Field(ge=1, le=200)
     notes: str = Field(default='', max_length=1000)
+
+
+class HistoryLog(SetLog):
+    set_index: int = Field(ge=1, le=20)
+
+
+class HistoryItem(BaseModel):
+    id: int = Field(gt=0)
+    skipped: bool = False
+    logs: List[HistoryLog] = Field(max_length=20)
+
+
+class HistoryEdit(BaseModel):
+    plan_name: str = Field(min_length=1, max_length=120)
+    started_at: datetime
+    finished_at: datetime
+    items: List[HistoryItem] = Field(min_length=1, max_length=60)
+
+    @model_validator(mode='after')
+    def valid_times(self):
+        if not self.plan_name.strip() or self.started_at.tzinfo is None or self.finished_at.tzinfo is None:
+            raise ValueError('Name und Datum mit Zeitzone erforderlich.')
+        if self.finished_at < self.started_at:
+            raise ValueError('Trainingsende darf nicht vor dem Beginn liegen.')
+        return self
 
 
 class Skip(BaseModel):
@@ -119,7 +152,7 @@ CREATE TABLE IF NOT EXISTS exercises (
  archived INTEGER NOT NULL DEFAULT 0
 );
 CREATE TABLE IF NOT EXISTS plans (
- id INTEGER PRIMARY KEY, name TEXT NOT NULL, category TEXT NOT NULL, archived INTEGER NOT NULL DEFAULT 0
+ id INTEGER PRIMARY KEY, name TEXT NOT NULL, category TEXT NOT NULL, target_muscles TEXT, archived INTEGER NOT NULL DEFAULT 0
 );
 CREATE TABLE IF NOT EXISTS plan_items (
  id INTEGER PRIMARY KEY, plan_id INTEGER NOT NULL REFERENCES plans(id),
@@ -130,6 +163,7 @@ CREATE TABLE IF NOT EXISTS sessions (
  id INTEGER PRIMARY KEY, profile_id INTEGER NOT NULL REFERENCES profiles(id),
  plan_name TEXT NOT NULL, category TEXT NOT NULL, started_at TEXT NOT NULL, finished_at TEXT
 );
+CREATE TABLE IF NOT EXISTS id_counters (name TEXT PRIMARY KEY, value INTEGER NOT NULL);
 CREATE UNIQUE INDEX IF NOT EXISTS one_active_session ON sessions(profile_id) WHERE finished_at IS NULL;
 CREATE TABLE IF NOT EXISTS session_items (
  id INTEGER PRIMARY KEY, session_id INTEGER NOT NULL REFERENCES sessions(id),
@@ -177,14 +211,19 @@ def create_app(data_dir=None, static_dir=None, ingress_only=None, media_dir=None
                 conn.execute("ALTER TABLE exercises ADD COLUMN onedrive_url TEXT NOT NULL DEFAULT ''")
             if 'media_path' not in columns:
                 conn.execute("ALTER TABLE exercises ADD COLUMN media_path TEXT NOT NULL DEFAULT ''")
-            conn.execute('PRAGMA user_version=3')
+            plan_columns = {row['name'] for row in conn.execute('PRAGMA table_info(plans)')}
+            if 'target_muscles' not in plan_columns:
+                conn.execute('ALTER TABLE plans ADD COLUMN target_muscles TEXT')
+            conn.execute("INSERT OR IGNORE INTO id_counters(name,value) SELECT 'sessions',COALESCE(MAX(id),0) FROM sessions")
+            conn.execute("UPDATE id_counters SET value=MAX(value,(SELECT COALESCE(MAX(id),0) FROM sessions)) WHERE name='sessions'")
+            conn.execute('PRAGMA user_version=4')
         (data / 'uploads').mkdir(exist_ok=True)
         # Remove partial uploads left by a power interruption, never finished videos.
         for partial in (data / 'videos').glob('*.part'):
             partial.unlink(missing_ok=True)
         yield
 
-    app = FastAPI(title='Helden-Training', version='0.1.6', lifespan=lifespan,
+    app = FastAPI(title='Helden-Training', version='0.1.7', lifespan=lifespan,
                   docs_url=None, redoc_url=None, openapi_url=None)
 
     @app.exception_handler(RequestValidationError)
@@ -244,7 +283,7 @@ def create_app(data_dir=None, static_dir=None, ingress_only=None, media_dir=None
             previous = conn.execute('''SELECT l.weight, l.reps, l.set_index, s.id AS source_session FROM set_logs l
                 JOIN session_items i ON i.id=l.item_id JOIN sessions s ON s.id=i.session_id
                 WHERE s.profile_id=? AND i.exercise_id=? AND s.id!=? AND s.finished_at IS NOT NULL
-                ORDER BY s.id DESC, l.set_index ASC''', (result['profile_id'], item['exercise_id'], identifier)).fetchall()
+                ORDER BY julianday(s.started_at) DESC, s.id DESC, l.set_index ASC''', (result['profile_id'], item['exercise_id'], identifier)).fetchall()
             # Only use the latest session that actually contains logged sets for this exercise.
             last = {}
             for log in previous:
@@ -266,7 +305,7 @@ def create_app(data_dir=None, static_dir=None, ingress_only=None, media_dir=None
 
     @app.get('/api/health')
     def health():
-        return {'status': 'ok', 'version': '0.1.6'}
+        return {'status': 'ok', 'version': '0.1.7'}
 
     @app.get('/api/local-media')
     def browse_media(folder: str = ''):
@@ -422,6 +461,7 @@ def create_app(data_dir=None, static_dir=None, ingress_only=None, media_dir=None
 
     def plan_detail(conn, identifier):
         plan = get(conn, 'plans', identifier)
+        plan['target_muscles'] = json.loads(plan['target_muscles']) if plan['target_muscles'] is not None else None
         plan['items'] = [dict(r) for r in conn.execute('''SELECT i.*, e.name AS exercise_name, e.archived AS exercise_archived
             FROM plan_items i JOIN exercises e ON e.id=i.exercise_id WHERE plan_id=? ORDER BY position''', (identifier,))]
         return plan
@@ -436,11 +476,14 @@ def create_app(data_dir=None, static_dir=None, ingress_only=None, media_dir=None
             raise HTTPException(422, 'Name oder Kategorie ungültig.')
         for item in body.items:
             get(conn, 'exercises', item.exercise_id, True)
+        targets = json.dumps(body.target_muscles) if body.target_muscles is not None else None
         if identifier is None:
-            identifier = conn.execute('INSERT INTO plans(name,category) VALUES (?,?)', (body.name.strip(), body.category)).lastrowid
+            identifier = conn.execute('INSERT INTO plans(name,category,target_muscles) VALUES (?,?,?)', (body.name.strip(), body.category, targets)).lastrowid
         else:
             get(conn, 'plans', identifier, True)
-            conn.execute('UPDATE plans SET name=?,category=? WHERE id=?', (body.name.strip(), body.category, identifier))
+            if 'target_muscles' not in body.model_fields_set:
+                targets = get(conn, 'plans', identifier)['target_muscles']
+            conn.execute('UPDATE plans SET name=?,category=?,target_muscles=? WHERE id=?', (body.name.strip(), body.category, targets, identifier))
             conn.execute('DELETE FROM plan_items WHERE plan_id=?', (identifier,))
         for position, item in enumerate(body.items):
             conn.execute('INSERT INTO plan_items(plan_id,exercise_id,position,sets,reps,rest_seconds,weight) VALUES (?,?,?,?,?,?,?)',
@@ -470,7 +513,7 @@ def create_app(data_dir=None, static_dir=None, ingress_only=None, media_dir=None
             return [dict(r) for r in conn.execute('''SELECT s.*, COUNT(l.id) AS logged_sets,
                 COALESCE(SUM(l.weight*l.reps),0) AS volume
                 FROM sessions s LEFT JOIN session_items i ON i.session_id=s.id
-                LEFT JOIN set_logs l ON l.item_id=i.id WHERE s.profile_id=? GROUP BY s.id ORDER BY s.id DESC''', (profile_id,))]
+                LEFT JOIN set_logs l ON l.item_id=i.id WHERE s.profile_id=? GROUP BY s.id ORDER BY julianday(s.started_at) DESC, s.id DESC''', (profile_id,))]
 
     @app.post('/api/sessions', status_code=201)
     def start_session(body: StartSession):
@@ -483,8 +526,10 @@ def create_app(data_dir=None, static_dir=None, ingress_only=None, media_dir=None
             items = conn.execute('SELECT * FROM plan_items WHERE plan_id=? ORDER BY position', (body.plan_id,)).fetchall()
             if not items:
                 raise HTTPException(422, 'Der Plan enthält keine Übungen.')
-            identifier = conn.execute('INSERT INTO sessions(profile_id,plan_name,category,started_at) VALUES (?,?,?,?)',
-                                      (body.profile_id, plan['name'], plan['category'], now())).lastrowid
+            # Never reuse deleted session IDs: stale open tabs must not edit a newer training.
+            identifier = conn.execute("UPDATE id_counters SET value=value+1 WHERE name='sessions' RETURNING value").fetchone()['value']
+            conn.execute('INSERT INTO sessions(id,profile_id,plan_name,category,started_at) VALUES (?,?,?,?,?)',
+                         (identifier, body.profile_id, plan['name'], plan['category'], now()))
             for item in items:
                 exercise = get(conn, 'exercises', item['exercise_id'], True)
                 exercise['categories'] = json.loads(exercise['categories'])
@@ -496,6 +541,39 @@ def create_app(data_dir=None, static_dir=None, ingress_only=None, media_dir=None
     def read_session(identifier: int):
         with db() as conn:
             return session_detail(conn, identifier)
+
+    @app.put('/api/sessions/{identifier}/history')
+    def edit_history(identifier: int, body: HistoryEdit):
+        with db() as conn:
+            conn.execute('BEGIN IMMEDIATE')
+            session = get(conn, 'sessions', identifier)
+            if not session['finished_at']:
+                raise HTTPException(409, 'Aktives Training bitte über Fortsetzen bearbeiten.')
+            stored = {row['id']: dict(row) for row in conn.execute('SELECT * FROM session_items WHERE session_id=?', (identifier,))}
+            if len({i.id for i in body.items}) != len(body.items) or {i.id for i in body.items} != set(stored):
+                raise HTTPException(422, 'Die Übungen müssen genau zu diesem Training gehören.')
+            for item in body.items:
+                indexes = [log.set_index for log in item.logs]
+                if len(set(indexes)) != len(indexes) or any(n > stored[item.id]['sets'] for n in indexes):
+                    raise HTTPException(422, 'Satznummer ungültig oder doppelt.')
+            conn.execute('UPDATE sessions SET plan_name=?,started_at=?,finished_at=? WHERE id=?',
+                         (body.plan_name.strip(), body.started_at.astimezone(timezone.utc).isoformat(), body.finished_at.astimezone(timezone.utc).isoformat(), identifier))
+            for item in body.items:
+                conn.execute('UPDATE session_items SET skipped=? WHERE id=?', (item.skipped, item.id))
+                conn.execute('DELETE FROM set_logs WHERE item_id=?', (item.id,))
+                for log in item.logs:
+                    conn.execute('INSERT INTO set_logs(item_id,set_index,weight,reps,notes,saved_at) VALUES (?,?,?,?,?,?)',
+                                 (item.id, log.set_index, log.weight, log.reps, log.notes, now()))
+            return session_detail(conn, identifier)
+
+    @app.delete('/api/sessions/{identifier}', status_code=204)
+    def delete_history(identifier: int):
+        with db() as conn:
+            conn.execute('BEGIN IMMEDIATE')
+            get(conn, 'sessions', identifier)
+            conn.execute('DELETE FROM set_logs WHERE item_id IN (SELECT id FROM session_items WHERE session_id=?)', (identifier,))
+            conn.execute('DELETE FROM session_items WHERE session_id=?', (identifier,))
+            conn.execute('DELETE FROM sessions WHERE id=?', (identifier,))
 
     @app.put('/api/sessions/{session_id}/items/{item_id}/sets/{set_index}')
     def log_set(session_id: int, item_id: int, set_index: int, body: SetLog):

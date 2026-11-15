@@ -1,3 +1,13 @@
+# 0.1.7
+
+- Umschaltbare Kachel-/Listenansicht der Übungsbibliothek mit gespeicherter Gerätepräferenz; gemeinsame Suche und Filter.
+- Zahlenfelder im Planeditor vollständig leeren und überschreiben; Dezimalkomma und -punkt für Gewichte, gültige Pflichtwerte erst beim Speichern verlangen.
+- Kategorievorlagen markieren Muskelgruppen in der Körpergrafik. Angepasste Auswahl bestätigen, Vorlage wiederherstellen und Zielmuskelgruppen mit dem Plan speichern.
+- Abgeschlossene Trainings im Verlauf separat korrigieren: Name, Zeiten, Sätze, Werte, Notizen und Übersprungen-Markierung; fehlende Sätze ergänzen und Sätze entfernen.
+- Aktive und abgeschlossene Trainings nach Bestätigung dauerhaft einschließlich ihrer Satzdaten löschen. Profile, Pläne und Videos erhalten.
+- Verlauf und Gewichtsvorschläge nach Trainingsbeginn ordnen; Korrekturen und Löschungen in Statistiken berücksichtigen.
+- Datenbank additiv erweitern; ältere Plan-Clients erhalten gespeicherte Zielgruppen bei Änderungen ohne neues Feld.
+
 # 0.1.6
 
 - Automatische lokale Standbilder für zugeordnete Medien und Uploads in der Übungsübersicht; Ausschnitt am Video-Start, begrenzter Cache, Platzhalter bei Fehlern.

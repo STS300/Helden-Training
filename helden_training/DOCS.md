@@ -10,6 +10,39 @@
 
 Die letzte Eingabe desselben Profils und derselben Übung aus abgeschlossenen Einheiten wird als Ausgangswert vorgeschlagen. Null kg steht beispielsweise für eine Übung mit dem eigenen Körpergewicht; das Körpergewicht wird nicht zum Volumen addiert.
 
+## Kacheln und Listenansicht (ab 0.1.7)
+
+In der Übungsbibliothek mit **Kacheln | Liste** wechseln. Die Liste zeigt Video-Standbild, Name, Kategorien, Muskelangaben, Geräte sowie Ansehen/Bearbeiten. Suche und Kategoriefilter gelten für beide Ansichten. Die Ansicht wird auf diesem Gerät im Browser gespeichert.
+
+## Zahlen schnell ändern (ab 0.1.7)
+
+Im Planeditor lassen sich Sätze, Wiederholungen, Gewicht und Pause vollständig leeren. Ein leeres Feld wird während der Eingabe nicht durch 0 ersetzt. Beim Fokussieren wird der vorhandene Wert markiert. Gewicht akzeptiert Dezimalkomma und Dezimalpunkt. Erst mit gültigen Pflichtangaben kann gespeichert werden: Sätze 1–20, Wiederholungen 1–200, Gewicht 0–2000 kg und Pause 0–1800 Sekunden. Dieselbe Eingabe wird beim Korrigieren des Trainingsverlaufs verwendet.
+
+## Kategorien als Muskelvorlagen (ab 0.1.7)
+
+Im Planeditor markiert die Kategorie automatisch die zugehörigen Muskelgruppen in der Körpergrafik:
+
+| Kategorie | Muskelgruppen |
+| --- | --- |
+| Ganzer Körper | Alle 21 Gruppen |
+| Oberkörper | Brust, Schultern, Bizeps, Trizeps, Unterarme, Bauch, seitlicher Bauch, Trapez/Nacken, Latissimus, mittlerer/unterer Rücken, Rotatorenmanschette und Sägemuskel |
+| Unterkörper | Gesäß, Quadrizeps, Beinbeuger, Adduktoren, Abduktoren, Hüftbeuger, Waden, Schienbein |
+| Beine | Quadrizeps, Beinbeuger, Adduktoren, Abduktoren, Waden, Schienbein |
+| Push | Brust, Schultern, Trizeps |
+| Pull | Latissimus, mittlerer Rücken, Trapez/Nacken, Bizeps, Unterarme |
+
+Die Vorlagen sind praktische Trainingsaufteilungen und pro Plan frei anpassbar. Nach einer Anpassung fragt ein Kategorienwechsel, ob die Auswahl ersetzt werden soll. Abbrechen erhält Kategorie und Muskelauswahl. **Kategorieauswahl wiederherstellen** übernimmt erneut die aktuelle Vorlage. Bereits hinzugefügte Übungen bleiben in allen Fällen erhalten.
+
+Die Muskelauswahl wird mit dem Plan gespeichert und beim Bearbeiten oder Duplizieren wieder geladen. Ältere Pläne ohne gespeicherte Auswahl starten mit ihrer Kategorievorlage. Bei Auswahl aller Gruppen oder keiner Gruppe zeigt die Bibliotheksauswahl alle Übungen; sonst nur Übungen mit mindestens einer übereinstimmenden Muskelzuordnung. Alte Freitextangaben ohne passende Zuordnung gegebenenfalls im Übungseditor ergänzen.
+
+## Trainingsverlauf bearbeiten und löschen (ab 0.1.7)
+
+Unter **Mein Verlauf** bieten abgeschlossene Trainings **Training bearbeiten** an. Trainingsname, Beginn und Ende (Zeitzone des Geräts), Gewichte, Wiederholungen, Satznotizen und Übersprungen-Markierung können geändert werden. Fehlende Sätze lassen sich bis zur ursprünglichen Satzanzahl ergänzen; vorhandene Sätze lassen sich entfernen. Die historischen Übungen und der ursprüngliche Plan bleiben erhalten. Mit **Änderungen speichern** wird die Korrektur gemeinsam gespeichert; **Abbrechen** verwirft sie. Das Ende darf nicht vor dem Beginn liegen. Aktive Trainings weiterhin über **Fortsetzen** bearbeiten.
+
+**Training löschen** ist bei aktiven und abgeschlossenen Trainings möglich. Die Bestätigung nennt Training und Datum. Löschen entfernt dieses Training samt Satzwerten und Notizen dauerhaft; ein aktives Profil kann danach ein neues Training starten. Profile, Übungen, Pläne, Videos und andere Trainings bleiben erhalten. Es gibt keinen Papierkorb; Wiederherstellung ist nur über ein vorheriges vollständiges Backup möglich.
+
+Statistiken und künftige Gewichtsvorschläge berücksichtigen die korrigierten Daten und schließen gelöschte Trainings aus. Der Verlauf wird nach Trainingsbeginn sortiert. Alle Personen mit Zugang zur App können wie bisher alle Trainingsprofile und deren Verlauf bearbeiten; Profile sind keine Berechtigungsgrenze.
+
 ## Muskelzuordnung und Planung mit Körpergrafik (ab 0.1.6)
 
 Unter **Übungsbibliothek → Bearbeiten → Muskelzuordnung der Übung** Muskelgruppen in der Vorder-/Rückansicht oder über die beschrifteten Schaltflächen auswählen. Mehrere Gruppen sind möglich; erneutes Antippen entfernt die Zuordnung. Danach **Übung speichern**. Die Grafik ist schematisch; kleine oder tiefer liegende Muskelgruppen werden als Trainingsregion dargestellt.
@@ -18,7 +51,7 @@ Unter **Übungsbibliothek → Bearbeiten → Muskelzuordnung der Übung** Muskel
 
 Bestehende freie Muskelangaben bleiben erhalten. Die Auswahl wird zusammen mit diesen Angaben im bisherigen Muskelfeld gespeichert und im Export sowie in Session-Snapshots übernommen. Alte Begriffe wie „Oberschenkel“ werden nicht automatisch einer konkreteren Gruppe zugeordnet: die passenden Schaltflächen einmalig ergänzen. Freitext kann im Feld darüber weiterhin bearbeitet werden.
 
-Unter **Trainingspläne → Plan erstellen/Bearbeiten → Übungen nach Muskelgruppen auswählen** dieselbe Grafik als Filter verwenden. Die Bibliotheksauswahl zeigt Übungen mit mindestens einer gewählten Gruppe. Ohne Auswahl werden alle Übungen angeboten. Übungen einzeln hinzufügen, Reihenfolge und Satzvorgaben festlegen und den Plan speichern. Die Körperauswahl ist ein Suchfilter und wird nicht als eigener Planparameter gespeichert; die hinzugefügten Übungen werden gespeichert. Ein neuer Filter entfernt keine bereits hinzugefügten Übungen. Ohne passende Übungen die Muskelzuordnung zuerst in der Bibliothek bearbeiten.
+Unter **Trainingspläne → Plan erstellen/Bearbeiten → Übungen nach Muskelgruppen auswählen** dieselbe Grafik als Filter verwenden. Die Bibliotheksauswahl zeigt Übungen mit mindestens einer gewählten Gruppe. Ohne Auswahl werden alle Übungen angeboten. Übungen einzeln hinzufügen, Reihenfolge und Satzvorgaben festlegen und den Plan speichern. Seit 0.1.7 werden sowohl die Muskelauswahl als auch die hinzugefügten Übungen mit dem Plan gespeichert. Ein neuer Filter entfernt keine bereits hinzugefügten Übungen. Ohne passende Übungen die Muskelzuordnung zuerst in der Bibliothek bearbeiten.
 
 ## Standbilder in der Übungsübersicht (ab 0.1.6)
 
@@ -30,7 +63,7 @@ Die App hält höchstens 200 erzeugte Bilder als erneuerbaren Cache in `/data/th
 
 Die App kann Videos direkt aus **`/media/helden-training`** lesen. Dabei entfallen Browser-Upload und OneDrive-Einbettung. Eine Microsoft-Anmeldung oder App-ID ist nicht erforderlich.
 
-1. Helden-Training auf **0.1.5** aktualisieren bzw. die lokale Installation ersetzen und **neu bauen**, anschließend starten. Erst die neue App-Konfiguration bindet den Medienordner schreibgeschützt ein; ein Neustart der alten Installation reicht nicht.
+1. Helden-Training auf die aktuelle Version (mindestens **0.1.5**) aktualisieren bzw. die lokale Installation ersetzen und **neu bauen**, anschließend starten. Erst die neue App-Konfiguration bindet den Medienordner schreibgeschützt ein; ein Neustart der alten Installation reicht nicht.
 2. In Home Assistant die offizielle App **Samba share** installieren und Benutzername/Passwort konfigurieren. Nur im eigenen Netzwerk verwenden.
 3. Auf dem iPhone/iPad in **Dateien → Durchsuchen → … → Mit Server verbinden** `smb://<IP-von-Home-Assistant>` öffnen und mit den Samba-Zugangsdaten anmelden. In der Freigabe **media** den Ordner **helden-training** erstellen. Am Mac geht dies im Finder über „Gehe zu → Mit Server verbinden“; unter Windows über `\\<IP-von-Home-Assistant>\media`.
 4. Die Videos aus OneDrive zuerst vollständig herunterladen und dann mit der Dateien-App in diesen Ordner kopieren. Unterordner wie **Beine** sind möglich. Die Datei muss tatsächlich auf dem Home-Assistant-Gerät liegen, eine Verknüpfung genügt nicht. Für die 38,5-MB-Datei Samba verwenden: Der Upload im Home-Assistant-Medienbrowser ist auf 20 MB begrenzt.
@@ -78,7 +111,7 @@ Alle angemeldeten Home-Assistant-Benutzer, die auf diese App zugreifen, können 
 
 Ein gespeicherter Satz ist sofort in der Datenbank. Nicht gespeicherte Eingaben gehen beim Schließen verloren. Pro Profil kann eine Einheit aktiv sein. Auf der Übersicht über **Fortsetzen** wieder öffnen. Der Pausentimer nutzt eine absolute Endzeit im Browser; bei ausgeschaltetem Bildschirm gibt es keine garantierte Benachrichtigung. Kein Offline-Schreibmodus: Zum Speichern muss die App erreichbar sein.
 
-„Übung überspringen“ erhält bereits gespeicherte Sätze. Ein Training kann nach Bestätigung auch mit offenen Sätzen abgeschlossen werden. Abgeschlossene Einheiten sind schreibgeschützt. Pläne und Übungen werden beim Start in die Session kopiert; spätere Änderungen verändern den Verlauf nicht.
+„Übung überspringen“ erhält bereits gespeicherte Sätze. Ein Training kann nach Bestätigung auch mit offenen Sätzen abgeschlossen werden. Die Trainingsansicht abgeschlossener Einheiten bleibt schreibgeschützt; Korrekturen erfolgen über „Training bearbeiten“ im Verlauf. Pläne und Übungen werden beim Start in die Session kopiert; spätere Änderungen verändern den Verlauf nicht.
 
 ## Datensicherung und Updates
 

@@ -1,3 +1,8 @@
+import { Modal } from "./Modal";
+import { NumberField } from "./NumberField";
+import { categoryMuscles } from "./categoryMuscles";
+import { muscleGroups } from "./MusclePicker";
+import { HistoryEditor } from "./HistoryEditor";
 import { MusclePicker, parseMuscles } from "./MusclePicker";
 import { VideoThumbnail } from "./VideoThumbnail";
 import React, { useCallback, useEffect, useRef, useState } from "react";
@@ -58,47 +63,6 @@ const nav = [
   { id: "profiles", title: "Profile", icon: Settings },
 ] as const;
 
-function Modal({
-  title,
-  children,
-  onClose,
-  busy = false,
-}: {
-  title: string;
-  children: React.ReactNode;
-  onClose: () => void;
-  busy?: boolean;
-}) {
-  const ref = useRef<HTMLDialogElement>(null);
-  useEffect(() => {
-    const dialog = ref.current;
-    dialog?.showModal();
-    return () => dialog?.close();
-  }, []);
-  return (
-    <dialog
-      ref={ref}
-      onCancel={(e) => {
-        e.preventDefault();
-        if (!busy) onClose();
-      }}
-      aria-label={title}
-    >
-      <div className="modal-head">
-        <h2>{title}</h2>
-        <button
-          disabled={busy}
-          className="icon"
-          aria-label="Schließen"
-          onClick={onClose}
-        >
-          <X size={20} />
-        </button>
-      </div>
-      {children}
-    </dialog>
-  );
-}
 function Empty({
   title,
   text,
@@ -179,6 +143,10 @@ function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [exerciseEditor, setExerciseEditor] = useState<Exercise | "new" | null>(
     null,
+  );
+  const [historyEditor, setHistoryEditor] = useState<Session | null>(null);
+  const [libraryView, setLibraryView] = useState(() =>
+    localStorage.getItem("helden-library-view") === "list" ? "list" : "cards",
   );
   const [planEditor, setPlanEditor] = useState<Plan | "new" | null>(null);
   const [profileEditor, setProfileEditor] = useState<Profile | "new" | null>(
@@ -555,7 +523,30 @@ function App() {
                     </label>
                     <CategoryFilter value={category} onChange={setCategory} />
                   </div>
-                  <div className="cards">
+                  <div className="view-switch" aria-label="Bibliotheksansicht">
+                    {[
+                      ["cards", "Kacheln"],
+                      ["list", "Liste"],
+                    ].map(([value, label]) => (
+                      <button
+                        key={value}
+                        type="button"
+                        className="secondary"
+                        aria-pressed={libraryView === value}
+                        onClick={() => {
+                          setLibraryView(value);
+                          localStorage.setItem("helden-library-view", value);
+                        }}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                  <div
+                    className={
+                      libraryView === "list" ? "exercise-list" : "cards"
+                    }
+                  >
                     {exercises.filter(matches).map((e) => (
                       <article className="card exercise-card" key={e.id}>
                         <button
@@ -762,34 +753,76 @@ function App() {
                   )}
                   <div className="history-list">
                     {sessions.map((s) => (
-                      <button
-                        className="history-row"
-                        key={s.id}
-                        disabled={busy}
-                        onClick={() =>
-                          run(async () =>
-                            setSession(await api<Session>(`sessions/${s.id}`)),
-                          )
-                        }
-                      >
-                        <span className="history-icon">
-                          <Dumbbell size={21} />
-                        </span>
-                        <span>
-                          <strong>{s.plan_name}</strong>
-                          <small>
-                            {date(s.started_at)} · {s.category}
-                          </small>
-                        </span>
-                        <span className="history-numbers">
-                          {s.logged_sets} Sätze
-                          <small>{number(s.volume)} kg Volumen</small>
-                        </span>
-                        <span className={`pill ${s.finished_at ? "" : "lime"}`}>
-                          {s.finished_at ? "Abgeschlossen" : "Aktiv"}
-                        </span>
-                        <ChevronRight size={17} />
-                      </button>
+                      <div className="history-entry" key={s.id}>
+                        <button
+                          className="history-row"
+                          key={s.id}
+                          disabled={busy}
+                          onClick={() =>
+                            run(async () =>
+                              setSession(
+                                await api<Session>(`sessions/${s.id}`),
+                              ),
+                            )
+                          }
+                        >
+                          <span className="history-icon">
+                            <Dumbbell size={21} />
+                          </span>
+                          <span>
+                            <strong>{s.plan_name}</strong>
+                            <small>
+                              {date(s.started_at)} · {s.category}
+                            </small>
+                          </span>
+                          <span className="history-numbers">
+                            {s.logged_sets} Sätze
+                            <small>{number(s.volume)} kg Volumen</small>
+                          </span>
+                          <span
+                            className={`pill ${s.finished_at ? "" : "lime"}`}
+                          >
+                            {s.finished_at ? "Abgeschlossen" : "Aktiv"}
+                          </span>
+                          <ChevronRight size={17} />
+                        </button>
+                        <div className="history-actions">
+                          {s.finished_at && (
+                            <button
+                              className="text-button"
+                              disabled={busy}
+                              onClick={() =>
+                                run(async () =>
+                                  setHistoryEditor(
+                                    await api<Session>(`sessions/${s.id}`),
+                                  ),
+                                )
+                              }
+                            >
+                              Training bearbeiten
+                            </button>
+                          )}
+                          <button
+                            className="text-button danger"
+                            disabled={busy}
+                            onClick={() => {
+                              if (
+                                !confirm(
+                                  `Training „${s.plan_name}“ vom ${date(s.started_at)} dauerhaft löschen? Alle Satzwerte und Notizen dieses Trainings werden gelöscht. Dies kann nicht rückgängig gemacht werden.`,
+                                )
+                              )
+                                return;
+                              run(async () => {
+                                await api(`sessions/${s.id}`, "DELETE");
+                                localStorage.removeItem(`helden-rest-${s.id}`);
+                                setSession(null);
+                              });
+                            }}
+                          >
+                            Training löschen
+                          </button>
+                        </div>
+                      </div>
                     ))}
                   </div>
                   {!sessions.length && (
@@ -886,7 +919,7 @@ function App() {
             </>
           )}
           <footer>
-            <Dumbbell size={14} /> HELDEN-TRAINING · 0.1.6{" "}
+            <Dumbbell size={14} /> HELDEN-TRAINING · 0.1.7{" "}
             <span>Dein Tempo. Dein Fortschritt.</span>
           </footer>
         </main>
@@ -896,6 +929,16 @@ function App() {
           exercise={exerciseEditor === "new" ? null : exerciseEditor}
           onClose={() => setExerciseEditor(null)}
           onSaved={refresh}
+        />
+      )}
+      {historyEditor && (
+        <HistoryEditor
+          session={historyEditor}
+          onClose={() => setHistoryEditor(null)}
+          onSaved={async () => {
+            setSession(null);
+            await refreshSessions(profileRef.current);
+          }}
         />
       )}
       {planEditor && (
@@ -1385,10 +1428,19 @@ function PlanEditor({
   const [category, setCategory] = useState(plan?.category || categories[0]);
   const [items, setItems] = useState<PlanItem[]>(plan?.items || []);
   const [choice, setChoice] = useState(0);
-  const [targetMuscles, setTargetMuscles] = useState<string[]>([]);
+  const [targetMuscles, setTargetMuscles] = useState<string[]>(
+    plan?.target_muscles ?? categoryMuscles[plan?.category || categories[0]],
+  );
+  const [musclesCustomized, setMusclesCustomized] = useState(
+    () =>
+      plan?.target_muscles != null &&
+      JSON.stringify([...plan.target_muscles].sort()) !==
+        JSON.stringify([...categoryMuscles[plan.category]].sort()),
+  );
   const matchingExercises = exercises.filter(
     (e) =>
       !targetMuscles.length ||
+      muscleGroups.every((m) => targetMuscles.includes(m)) ||
       parseMuscles(e.muscles).some((m) => targetMuscles.includes(m)),
   );
 
@@ -1419,7 +1471,7 @@ function PlanEditor({
             await api(
               plan?.id ? `plans/${plan.id}` : "plans",
               plan?.id ? "PUT" : "POST",
-              { name, category, items },
+              { name, category, items, target_muscles: targetMuscles },
             );
             await onSaved();
             onClose();
@@ -1449,7 +1501,20 @@ function PlanEditor({
           Kategorie
           <select
             value={category}
-            onChange={(e) => setCategory(e.target.value)}
+            onChange={(e) => {
+              const next = e.target.value;
+              if (
+                musclesCustomized &&
+                !confirm(
+                  "Kategorie wechseln und die angepasste Muskelauswahl durch die Vorlage ersetzen? Bereits hinzugefügte Übungen bleiben erhalten.",
+                )
+              )
+                return;
+              setCategory(next);
+              setTargetMuscles([...categoryMuscles[next]]);
+              setMusclesCustomized(false);
+              setChoice(0);
+            }}
           >
             {categories.map((c) => (
               <option key={c}>{c}</option>
@@ -1461,9 +1526,21 @@ function PlanEditor({
           value={targetMuscles}
           onChange={(groups) => {
             setTargetMuscles(groups);
+            setMusclesCustomized(true);
             setChoice(0);
           }}
         />
+        <button
+          type="button"
+          className="text-button"
+          onClick={() => {
+            setTargetMuscles([...categoryMuscles[category]]);
+            setMusclesCustomized(false);
+            setChoice(0);
+          }}
+        >
+          Kategorieauswahl wiederherstellen
+        </button>
         <p className="notice">
           {matchingExercises.length} passende Übungen. Bei Mehrfachauswahl
           genügt eine übereinstimmende Muskelgruppe. Bereits hinzugefügte
@@ -1532,14 +1609,12 @@ function PlanEditor({
                 ).map((f) => (
                   <label key={f.key}>
                     {f.label}
-                    <input
-                      type="number"
-                      required
+                    <NumberField
+                      value={item[f.key]}
                       min={f.min}
                       max={f.max}
-                      step={f.key === "weight" ? 0.25 : 1}
-                      value={item[f.key]}
-                      onChange={(e) => update(index, f.key, +e.target.value)}
+                      integer={f.key !== "weight"}
+                      onChange={(value) => update(index, f.key, value)}
                     />
                   </label>
                 ))}
