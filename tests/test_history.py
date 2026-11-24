@@ -42,7 +42,7 @@ def test_history_edit_updates_stats_and_suggestions_without_changing_plan(client
 def test_history_validation_is_atomic_and_rejects_foreign_items(client):
     profile, exercise, plan = setup_training(client)
     session = start(client, profile, plan)
-    assert client.put(f"/api/sessions/{session['id']}/history", json={**edit_body(session), 'finished_at': '2026-11-15T12:00:00Z'}).status_code == 409
+    assert client.put(f"/api/sessions/{session['id']}/history", json={**edit_body(session), 'finished_at': session['started_at']}).status_code == 409
     session = client.post(f"/api/sessions/{session['id']}/finish").json()
     url = f"/api/sessions/{session['id']}/history"
     base = edit_body(session)

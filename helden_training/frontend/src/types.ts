@@ -12,6 +12,7 @@ export interface Profile {
   color: string;
 }
 export interface Exercise {
+  assignment_groups?: ("STS" | "SAM")[];
   id: number;
   name: string;
   categories: string[];
@@ -37,6 +38,7 @@ export interface PlanItem {
   exercise_archived?: number;
 }
 export interface Plan {
+  assignment_filter?: "all" | "STS" | "SAM" | "unassigned";
   target_muscles?: string[] | null;
   id: number;
   name: string;

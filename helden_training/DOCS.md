@@ -10,6 +10,16 @@
 
 Die letzte Eingabe desselben Profils und derselben Übung aus abgeschlossenen Einheiten wird als Ausgangswert vorgeschlagen. Null kg steht beispielsweise für eine Übung mit dem eigenen Körpergewicht; das Körpergewicht wird nicht zum Volumen addiert.
 
+## STS und SAM zuordnen und filtern (ab 0.1.8)
+
+Im Übungseditor unter **STS-/SAM-Zuordnung** STS, SAM, beide oder keine Gruppe auswählen und die Übung speichern. Die Zuordnung ist unabhängig von Trainingskategorien, Muskelgruppen und Trainingsprofilen. In Kachel- und Listenansicht erscheinen die ausgewählten Gruppen als Kennzeichnungen.
+
+Der **STS-/SAM-Filter** in der Bibliothek bietet **Alle**, **STS**, **SAM** und **Ohne Zuordnung**. Übungen mit beiden Zuordnungen erscheinen sowohl unter STS als auch unter SAM. Der Filter wird mit Suche und Trainingskategorie kombiniert, beispielsweise STS + Oberkörper. Beim Wechsel des Hauptbereichs wird der Bibliotheksfilter auf Alle zurückgesetzt.
+
+Im Planeditor gibt es denselben Filter. Er grenzt die angebotenen Übungen zusätzlich zur Muskelauswahl ein. Beispiel: SAM + Unterkörper zeigt SAM-Übungen mit mindestens einer passenden Muskelgruppe. Bereits hinzugefügte Übungen bleiben bei einem Filter- oder Zuordnungswechsel erhalten. Nach einem Filterwechsel muss eine noch nicht hinzugefügte Übung neu aus der Liste gewählt werden.
+
+Die Auswahl wird mit dem Plan gespeichert und beim Bearbeiten sowie Duplizieren wiederhergestellt. Der Filter verändert keine persönlichen Gewichte und ist keine Berechtigungsgrenze. Bestehende Übungen erhalten beim Update keine Zuordnung; bestehende Pläne verwenden Alle. Spätere Änderungen einer Übungszuordnung ändern frühere Trainings-Snapshots nicht.
+
 ## Kacheln und Listenansicht (ab 0.1.7)
 
 In der Übungsbibliothek mit **Kacheln | Liste** wechseln. Die Liste zeigt Video-Standbild, Name, Kategorien, Muskelangaben, Geräte sowie Ansehen/Bearbeiten. Suche und Kategoriefilter gelten für beide Ansichten. Die Ansicht wird auf diesem Gerät im Browser gespeichert.

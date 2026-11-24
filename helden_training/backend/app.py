@@ -7,7 +7,7 @@ import uuid
 from contextlib import asynccontextmanager, contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Literal
 from urllib.parse import urlsplit
 
 from fastapi import FastAPI, HTTPException, Request
@@ -36,6 +36,13 @@ class Profile(BaseModel):
 class Exercise(BaseModel):
     name: str = Field(min_length=1, max_length=120)
     categories: List[str] = Field(min_length=1, max_length=6)
+    assignment_groups: List[Literal['STS', 'SAM']] = Field(default_factory=list, max_length=2)
+
+    @field_validator('assignment_groups')
+    @classmethod
+    def unique_assignments(cls, value):
+        return list(dict.fromkeys(value))
+
     muscles: str = Field(default='', max_length=300)
     equipment: str = Field(default='', max_length=200)
     notes: str = Field(default='', max_length=2000)
@@ -88,6 +95,7 @@ class Plan(BaseModel):
     name: str = Field(min_length=1, max_length=120)
     category: str
     items: List[PlanItem] = Field(min_length=1, max_length=60)
+    assignment_filter: Literal['all', 'STS', 'SAM', 'unassigned'] = 'all'
     target_muscles: Optional[List[str]] = Field(default=None, max_length=40)
 
     @field_validator("target_muscles")
@@ -149,10 +157,11 @@ CREATE TABLE IF NOT EXISTS exercises (
  start_seconds REAL NOT NULL, end_seconds REAL, video TEXT,
  onedrive_url TEXT NOT NULL DEFAULT '',
  media_path TEXT NOT NULL DEFAULT '',
+ assignment_groups TEXT NOT NULL DEFAULT '[]',
  archived INTEGER NOT NULL DEFAULT 0
 );
 CREATE TABLE IF NOT EXISTS plans (
- id INTEGER PRIMARY KEY, name TEXT NOT NULL, category TEXT NOT NULL, target_muscles TEXT, archived INTEGER NOT NULL DEFAULT 0
+ id INTEGER PRIMARY KEY, name TEXT NOT NULL, category TEXT NOT NULL, target_muscles TEXT, assignment_filter TEXT NOT NULL DEFAULT 'all', archived INTEGER NOT NULL DEFAULT 0
 );
 CREATE TABLE IF NOT EXISTS plan_items (
  id INTEGER PRIMARY KEY, plan_id INTEGER NOT NULL REFERENCES plans(id),
@@ -211,19 +220,23 @@ def create_app(data_dir=None, static_dir=None, ingress_only=None, media_dir=None
                 conn.execute("ALTER TABLE exercises ADD COLUMN onedrive_url TEXT NOT NULL DEFAULT ''")
             if 'media_path' not in columns:
                 conn.execute("ALTER TABLE exercises ADD COLUMN media_path TEXT NOT NULL DEFAULT ''")
+            if 'assignment_groups' not in columns:
+                conn.execute("ALTER TABLE exercises ADD COLUMN assignment_groups TEXT NOT NULL DEFAULT '[]'")
             plan_columns = {row['name'] for row in conn.execute('PRAGMA table_info(plans)')}
             if 'target_muscles' not in plan_columns:
                 conn.execute('ALTER TABLE plans ADD COLUMN target_muscles TEXT')
+            if 'assignment_filter' not in plan_columns:
+                conn.execute("ALTER TABLE plans ADD COLUMN assignment_filter TEXT NOT NULL DEFAULT 'all'")
             conn.execute("INSERT OR IGNORE INTO id_counters(name,value) SELECT 'sessions',COALESCE(MAX(id),0) FROM sessions")
             conn.execute("UPDATE id_counters SET value=MAX(value,(SELECT COALESCE(MAX(id),0) FROM sessions)) WHERE name='sessions'")
-            conn.execute('PRAGMA user_version=4')
+            conn.execute('PRAGMA user_version=5')
         (data / 'uploads').mkdir(exist_ok=True)
         # Remove partial uploads left by a power interruption, never finished videos.
         for partial in (data / 'videos').glob('*.part'):
             partial.unlink(missing_ok=True)
         yield
 
-    app = FastAPI(title='Helden-Training', version='0.1.7', lifespan=lifespan,
+    app = FastAPI(title='Helden-Training', version='0.1.8', lifespan=lifespan,
                   docs_url=None, redoc_url=None, openapi_url=None)
 
     @app.exception_handler(RequestValidationError)
@@ -259,6 +272,7 @@ def create_app(data_dir=None, static_dir=None, ingress_only=None, media_dir=None
     def exercise_dict(row):
         result = dict(row)
         result['categories'] = json.loads(result['categories'])
+        result['assignment_groups'] = json.loads(result['assignment_groups'])
         filename = result.pop('video')
         result['has_uploaded_video'] = bool(filename)
         try:
@@ -279,6 +293,8 @@ def create_app(data_dir=None, static_dir=None, ingress_only=None, media_dir=None
             item['exercise'] = json.loads(item.pop('snapshot'))
             item['exercise'].setdefault('onedrive_url', '')
             item['exercise'].setdefault('media_path', '')
+            groups = item['exercise'].get('assignment_groups', [])
+            item['exercise']['assignment_groups'] = json.loads(groups) if isinstance(groups, str) else groups
             item['logs'] = [dict(r) for r in conn.execute('SELECT * FROM set_logs WHERE item_id=? ORDER BY set_index', (item['id'],))]
             previous = conn.execute('''SELECT l.weight, l.reps, l.set_index, s.id AS source_session FROM set_logs l
                 JOIN session_items i ON i.id=l.item_id JOIN sessions s ON s.id=i.session_id
@@ -305,7 +321,7 @@ def create_app(data_dir=None, static_dir=None, ingress_only=None, media_dir=None
 
     @app.get('/api/health')
     def health():
-        return {'status': 'ok', 'version': '0.1.7'}
+        return {'status': 'ok', 'version': '0.1.8'}
 
     @app.get('/api/local-media')
     def browse_media(folder: str = ''):
@@ -361,13 +377,16 @@ def create_app(data_dir=None, static_dir=None, ingress_only=None, media_dir=None
             media_path = get(conn, 'exercises', identifier, True)['media_path']
         if media_path and (identifier is None or media_path != get(conn, 'exercises', identifier, True)['media_path']):
             local_media.resolve(media_path)
-        values = (body.name.strip(), json.dumps(body.categories), body.muscles, body.equipment, body.notes, body.start_seconds, body.end_seconds, link, media_path)
+        groups = json.dumps(body.assignment_groups)
+        if identifier is not None and 'assignment_groups' not in body.model_fields_set:
+            groups = get(conn, 'exercises', identifier, True)['assignment_groups']
+        values = (body.name.strip(), json.dumps(body.categories), body.muscles, body.equipment, body.notes, body.start_seconds, body.end_seconds, link, media_path, groups)
         if identifier is None:
-            identifier = conn.execute('''INSERT INTO exercises(name,categories,muscles,equipment,notes,start_seconds,end_seconds,onedrive_url,media_path)
-                VALUES (?,?,?,?,?,?,?,?,?)''', values).lastrowid
+            identifier = conn.execute('''INSERT INTO exercises(name,categories,muscles,equipment,notes,start_seconds,end_seconds,onedrive_url,media_path,assignment_groups)
+                VALUES (?,?,?,?,?,?,?,?,?,?)''', values).lastrowid
         else:
             get(conn, 'exercises', identifier, True)
-            conn.execute('UPDATE exercises SET name=?,categories=?,muscles=?,equipment=?,notes=?,start_seconds=?,end_seconds=?,onedrive_url=?,media_path=? WHERE id=?', values + (identifier,))
+            conn.execute('UPDATE exercises SET name=?,categories=?,muscles=?,equipment=?,notes=?,start_seconds=?,end_seconds=?,onedrive_url=?,media_path=?,assignment_groups=? WHERE id=?', values + (identifier,))
         return exercise_dict(get(conn, 'exercises', identifier))
 
     @app.post('/api/exercises', status_code=201)
@@ -476,14 +495,17 @@ def create_app(data_dir=None, static_dir=None, ingress_only=None, media_dir=None
             raise HTTPException(422, 'Name oder Kategorie ungültig.')
         for item in body.items:
             get(conn, 'exercises', item.exercise_id, True)
+        assignment_filter = body.assignment_filter
         targets = json.dumps(body.target_muscles) if body.target_muscles is not None else None
         if identifier is None:
-            identifier = conn.execute('INSERT INTO plans(name,category,target_muscles) VALUES (?,?,?)', (body.name.strip(), body.category, targets)).lastrowid
+            identifier = conn.execute('INSERT INTO plans(name,category,target_muscles,assignment_filter) VALUES (?,?,?,?)', (body.name.strip(), body.category, targets, assignment_filter)).lastrowid
         else:
             get(conn, 'plans', identifier, True)
             if 'target_muscles' not in body.model_fields_set:
                 targets = get(conn, 'plans', identifier)['target_muscles']
-            conn.execute('UPDATE plans SET name=?,category=?,target_muscles=? WHERE id=?', (body.name.strip(), body.category, targets, identifier))
+            if 'assignment_filter' not in body.model_fields_set:
+                assignment_filter = get(conn, 'plans', identifier)['assignment_filter']
+            conn.execute('UPDATE plans SET name=?,category=?,target_muscles=?,assignment_filter=? WHERE id=?', (body.name.strip(), body.category, targets, assignment_filter, identifier))
             conn.execute('DELETE FROM plan_items WHERE plan_id=?', (identifier,))
         for position, item in enumerate(body.items):
             conn.execute('INSERT INTO plan_items(plan_id,exercise_id,position,sets,reps,rest_seconds,weight) VALUES (?,?,?,?,?,?,?)',

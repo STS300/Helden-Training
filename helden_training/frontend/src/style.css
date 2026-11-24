@@ -1808,3 +1808,27 @@ video {
   max-width: 100%;
   width: 100%;
 }
+.assignment-filter {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  margin: 12px 0;
+  min-width: 160px;
+}
+.assignment-filter select {
+  width: 100%;
+}
+.assignment-filter select {
+  min-height: 44px;
+  padding: 9px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  color: inherit;
+  font: inherit;
+}
+.filters .assignment-filter {
+  margin: 0;
+}

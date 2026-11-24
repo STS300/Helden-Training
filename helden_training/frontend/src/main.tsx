@@ -1,3 +1,8 @@
+import {
+  AssignmentFilter,
+  matchesAssignment,
+  type Assignment,
+} from "./AssignmentFilter";
 import { Modal } from "./Modal";
 import { NumberField } from "./NumberField";
 import { categoryMuscles } from "./categoryMuscles";
@@ -158,6 +163,7 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("Alle");
+  const [assignment, setAssignment] = useState<Assignment>("all");
   const profile = profiles.find((p) => p.id === profileId);
   const profileRef = useRef(profileId);
   profileRef.current = profileId;
@@ -238,9 +244,11 @@ function App() {
     setTab(next);
     setSession(null);
     setCategory("Alle");
+    setAssignment("all");
     setSearch("");
   }
   const matches = (e: Exercise) =>
+    matchesAssignment(e, assignment) &&
     (category === "Alle" || e.categories.includes(category)) &&
     `${e.name} ${e.equipment} ${e.muscles}`
       .toLowerCase()
@@ -522,6 +530,10 @@ function App() {
                       />
                     </label>
                     <CategoryFilter value={category} onChange={setCategory} />
+                    <AssignmentFilter
+                      value={assignment}
+                      onChange={setAssignment}
+                    />
                   </div>
                   <div className="view-switch" aria-label="Bibliotheksansicht">
                     {[
@@ -577,6 +589,11 @@ function App() {
                         </button>
                         <div className="card-body">
                           <div className="tags">
+                            {(e.assignment_groups || []).map((group) => (
+                              <span className="pill lime" key={group}>
+                                {group}
+                              </span>
+                            ))}
                             {e.categories.map((c) => (
                               <span className="pill" key={c}>
                                 {c}
@@ -614,8 +631,16 @@ function App() {
                   </div>
                   {!exercises.filter(matches).length && (
                     <Empty
-                      title="Hier entsteht deine Bibliothek"
-                      text="Lade dein erstes Übungsvideo hoch oder passe deine Suche an."
+                      title={
+                        exercises.length
+                          ? "Keine passenden Übungen"
+                          : "Hier entsteht deine Bibliothek"
+                      }
+                      text={
+                        exercises.length
+                          ? "Ändere Suche, Trainingskategorie oder STS-/SAM-Filter."
+                          : "Lege deine erste Übung an oder lade ein Übungsvideo hoch."
+                      }
                     />
                   )}
                 </>
@@ -919,7 +944,7 @@ function App() {
             </>
           )}
           <footer>
-            <Dumbbell size={14} /> HELDEN-TRAINING · 0.1.7{" "}
+            <Dumbbell size={14} /> HELDEN-TRAINING · 0.1.8{" "}
             <span>Dein Tempo. Dein Fortschritt.</span>
           </footer>
         </main>
@@ -1127,6 +1152,7 @@ function ExerciseEditor({
     categories: exercise?.categories || ["Ganzer Körper"],
     equipment: exercise?.equipment || "",
     muscles: exercise?.muscles || "",
+    assignment_groups: exercise?.assignment_groups || [],
     notes: exercise?.notes || "",
     start_seconds: exercise?.start_seconds || 0,
     end_seconds: exercise?.end_seconds ?? null,
@@ -1228,6 +1254,32 @@ function ExerciseEditor({
                   }
                 />
                 {c}
+              </label>
+            ))}
+          </div>
+        </fieldset>
+        <fieldset>
+          <legend>STS-/SAM-Zuordnung</legend>
+          <p className="muted">
+            Optional: eine, beide oder keine Gruppe auswählen. Unabhängig von
+            Trainingskategorie und Profil.
+          </p>
+          <div className="checkboxes">
+            {(["STS", "SAM"] as const).map((group) => (
+              <label key={group}>
+                <input
+                  type="checkbox"
+                  checked={value.assignment_groups.includes(group)}
+                  onChange={(e) =>
+                    setValue({
+                      ...value,
+                      assignment_groups: e.target.checked
+                        ? [...value.assignment_groups, group]
+                        : value.assignment_groups.filter((g) => g !== group),
+                    })
+                  }
+                />
+                {group}
               </label>
             ))}
           </div>
@@ -1428,6 +1480,9 @@ function PlanEditor({
   const [category, setCategory] = useState(plan?.category || categories[0]);
   const [items, setItems] = useState<PlanItem[]>(plan?.items || []);
   const [choice, setChoice] = useState(0);
+  const [assignment, setAssignment] = useState<Assignment>(
+    plan?.assignment_filter || "all",
+  );
   const [targetMuscles, setTargetMuscles] = useState<string[]>(
     plan?.target_muscles ?? categoryMuscles[plan?.category || categories[0]],
   );
@@ -1439,9 +1494,10 @@ function PlanEditor({
   );
   const matchingExercises = exercises.filter(
     (e) =>
-      !targetMuscles.length ||
-      muscleGroups.every((m) => targetMuscles.includes(m)) ||
-      parseMuscles(e.muscles).some((m) => targetMuscles.includes(m)),
+      matchesAssignment(e, assignment) &&
+      (!targetMuscles.length ||
+        muscleGroups.every((m) => targetMuscles.includes(m)) ||
+        parseMuscles(e.muscles).some((m) => targetMuscles.includes(m))),
   );
 
   const [busy, setBusy] = useState(false);
@@ -1471,7 +1527,13 @@ function PlanEditor({
             await api(
               plan?.id ? `plans/${plan.id}` : "plans",
               plan?.id ? "PUT" : "POST",
-              { name, category, items, target_muscles: targetMuscles },
+              {
+                name,
+                category,
+                items,
+                target_muscles: targetMuscles,
+                assignment_filter: assignment,
+              },
             );
             await onSaved();
             onClose();
@@ -1521,6 +1583,13 @@ function PlanEditor({
             ))}
           </select>
         </label>
+        <AssignmentFilter
+          value={assignment}
+          onChange={(value) => {
+            setAssignment(value);
+            setChoice(0);
+          }}
+        />
         <MusclePicker
           label="Übungen nach Muskelgruppen auswählen"
           value={targetMuscles}
@@ -1547,10 +1616,11 @@ function PlanEditor({
           Übungen bleiben im Plan. Die Zuordnung bearbeitest du in der
           Übungsbibliothek.
         </p>
-        {targetMuscles.length > 0 && !matchingExercises.length && (
+        {!matchingExercises.length && (
           <p role="status">
-            Keine passende Übung. Weise Übungen in der Bibliothek die gewählten
-            Muskelgruppen zu oder ändere die Auswahl.
+            Keine passende Übung. Prüfe den STS-/SAM-Filter oder weise Übungen
+            in der Bibliothek die gewählten Muskelgruppen zu oder ändere die
+            Auswahl.
           </p>
         )}
         <div className="plan-builder">

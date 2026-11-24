@@ -837,3 +837,143 @@ test("Library views, editable numbers, category templates and history correction
   await page.getByRole("button", { name: "Mein Verlauf", exact: true }).click();
   await expect(page.locator(".history-entry")).toHaveCount(0);
 });
+
+test("STS and SAM assignments combine with library and plan filters", async ({
+  page,
+}, testInfo) => {
+  const prefix = `Gruppen ${testInfo.project.name}`;
+  const headers = { "X-Helden-Request": "1" };
+  const data = [
+    {
+      name: `${prefix} STS`,
+      assignment_groups: ["STS"],
+      categories: ["Oberkörper"],
+      muscles: "Brust",
+    },
+    {
+      name: `${prefix} SAM`,
+      assignment_groups: ["SAM"],
+      categories: ["Unterkörper"],
+      muscles: "Quadrizeps",
+    },
+    {
+      name: `${prefix} Beide`,
+      assignment_groups: ["STS", "SAM"],
+      categories: ["Oberkörper"],
+      muscles: "Trizeps",
+    },
+    {
+      name: `${prefix} Ohne`,
+      assignment_groups: [],
+      categories: ["Oberkörper"],
+      muscles: "Brust",
+    },
+  ];
+  const exercises = [];
+  for (const exercise of data)
+    exercises.push(
+      await (
+        await page.request.post("/api/exercises", { headers, data: exercise })
+      ).json(),
+    );
+  await page.goto("/api/hassio_ingress/test-token/");
+  await page.getByRole("button", { name: "Übungsbibliothek" }).click();
+  await page.getByRole("button", { name: "Übung hinzufügen" }).click();
+  await page.getByLabel("Übungsname").fill(`${prefix} UI`);
+  const assignment = page.getByRole("group", {
+    name: "STS-/SAM-Zuordnung",
+    exact: true,
+  });
+  await assignment.getByRole("checkbox", { name: "STS", exact: true }).check();
+  await assignment.getByRole("checkbox", { name: "SAM", exact: true }).check();
+  await page
+    .getByRole("group", { name: "Muskelzuordnung der Übung", exact: true })
+    .getByRole("button", { name: "Brust", exact: true })
+    .click();
+  await page.getByRole("button", { name: "Übung speichern" }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await page.getByPlaceholder("Übung, Muskel oder Gerät suchen").fill(prefix);
+  const filter = page.getByRole("combobox", {
+    name: "STS-/SAM-Filter",
+    exact: true,
+  });
+  const cards = page.locator(".exercise-card");
+  await expect(cards).toHaveCount(5);
+  await filter.selectOption("STS");
+  await expect(cards).toHaveCount(3);
+  await filter.selectOption("SAM");
+  await expect(cards).toHaveCount(3);
+  await filter.selectOption("unassigned");
+  await expect(cards).toHaveCount(1);
+  await expect(cards).toContainText(`${prefix} Ohne`);
+  await filter.selectOption("STS");
+  await page.getByRole("button", { name: "Oberkörper", exact: true }).click();
+  await expect(cards).toHaveCount(2);
+  await page.getByRole("button", { name: "Liste", exact: true }).click();
+  await expect(page.locator(".exercise-list .exercise-card")).toHaveCount(2);
+  await page.screenshot({
+    path: `test-results/assignment-list-${testInfo.project.name}.png`,
+    fullPage: true,
+  });
+  await expect(
+    cards.filter({ hasText: `${prefix} Beide` }).locator(".tags"),
+  ).toContainText("SAM");
+  await page
+    .getByPlaceholder("Übung, Muskel oder Gerät suchen")
+    .fill(`${prefix} STS`);
+  await expect(cards).toHaveCount(1);
+  await page.getByRole("button", { name: "Alle", exact: true }).click();
+  await filter.selectOption("all");
+  await page
+    .getByPlaceholder("Übung, Muskel oder Gerät suchen")
+    .fill(`${prefix} UI`);
+  await cards.getByRole("button", { name: "Bearbeiten", exact: true }).click();
+  await expect(
+    assignment.getByRole("checkbox", { name: "STS", exact: true }),
+  ).toBeChecked();
+  await assignment
+    .getByRole("checkbox", { name: "STS", exact: true })
+    .uncheck();
+  await page.getByRole("button", { name: "Übung speichern" }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await filter.selectOption("STS");
+  await expect(cards).toHaveCount(0);
+  await filter.selectOption("SAM");
+  await expect(cards).toHaveCount(1);
+  await page
+    .getByRole("button", { name: "Trainingspläne", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Plan erstellen", exact: true })
+    .click();
+  await page.getByLabel("Name des Plans").fill(`${prefix} Plan`);
+  await page
+    .getByRole("combobox", { name: "Kategorie", exact: true })
+    .selectOption("Oberkörper");
+  await filter.selectOption("SAM");
+  const choice = page.getByRole("combobox", { name: "Übung hinzufügen" });
+  const options = choice.locator("option").filter({ hasText: prefix });
+  await expect(options).toHaveCount(2);
+  await expect(
+    choice.locator(`option[value="${exercises[1].id}"]`),
+  ).toHaveCount(0);
+  await choice.selectOption(String(exercises[2].id));
+  await page.getByRole("dialog").locator(".add-exercise button").click();
+  await filter.selectOption("unassigned");
+  await expect(options).toHaveCount(1);
+  await expect(page.locator(".builder-item")).toContainText(`${prefix} Beide`);
+  await expect(choice).toHaveValue("0");
+  await filter.selectOption("SAM");
+  await page.getByRole("button", { name: "Plan speichern" }).click();
+  const plan = page.locator(".plan-card").filter({ hasText: `${prefix} Plan` });
+  await plan.getByRole("button", { name: "Bearbeiten", exact: true }).click();
+  await expect(filter).toHaveValue("SAM");
+  await expect(page.locator(".builder-item")).toContainText(`${prefix} Beide`);
+  await page.getByRole("button", { name: "Abbrechen", exact: true }).click();
+  await plan
+    .locator("..")
+    .getByRole("button", { name: "Duplizieren", exact: true })
+    .click();
+  await expect(filter).toHaveValue("SAM");
+  await page.getByRole("button", { name: "Abbrechen", exact: true }).click();
+});

@@ -1,3 +1,11 @@
+# 0.1.8
+
+- Optionale STS-/SAM-Zuordnung je Übung: eine, beide oder keine Gruppe; im Übungseditor bearbeitbar und in Kachel-/Listenansicht gekennzeichnet.
+- Bibliotheksfilter Alle, STS, SAM und Ohne Zuordnung mit Suche und Trainingskategorie kombinieren.
+- Derselbe Filter im Planeditor zusätzlich zur Muskelauswahl; gewählte Planübungen bei Filterwechsel erhalten.
+- Filterauswahl im Plan speichern und beim Bearbeiten/Duplizieren wiederherstellen.
+- Bestehende Übungen ohne Zuordnung und Pläne mit Filter Alle übernehmen. Ältere Clients erhalten neue Felder beim Speichern ohne Feldangabe; historische Snapshots bleiben lesbar.
+
 # 0.1.7
 
 - Umschaltbare Kachel-/Listenansicht der Übungsbibliothek mit gespeicherter Gerätepräferenz; gemeinsame Suche und Filter.
