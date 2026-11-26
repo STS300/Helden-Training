@@ -1,3 +1,13 @@
+# 0.1.9
+
+- Neuer Startseiten-Einstieg „Training nach Muskelgruppen“ mit Körpergrafik, optionalen Kategorievorlagen, STS-/SAM-Filter und Suche.
+- Passende Übungen in einer Ansicht anzeigen, einzeln oder gemeinsam auswählen, Vorschau öffnen, Reihenfolge und Satzvorgaben ändern.
+- Training ohne vorherigen Plan direkt starten; echte Session mit unveränderlichen Übungs-Snapshots, Verlauf, Fortsetzen und vorhandenen Bearbeitungs-/Löschfunktionen.
+- Persönliche Gewicht-/Wiederholungsvorschläge aus abgeschlossenen Trainings laden. Profilwechsel erhalten die Übungsauswahl und laden neue persönliche Vorgaben.
+- Manuell geänderte Vorgaben beim Direktstart übernehmen; bestehende planbasierte Vorschläge erhalten.
+- Zusammenstellung optional als Plan inklusive Muskel- und STS-/SAM-Filter speichern.
+- Ein aktives Training pro Profil weiterhin atomar erzwingen; vorhandene Sessions bei Migration als planbasiert übernehmen.
+
 # 0.1.8
 
 - Optionale STS-/SAM-Zuordnung je Übung: eine, beide oder keine Gruppe; im Übungseditor bearbeitbar und in Kachel-/Listenansicht gekennzeichnet.

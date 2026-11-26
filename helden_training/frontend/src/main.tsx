@@ -1,3 +1,4 @@
+import { MuscleTraining } from "./MuscleTraining";
 import {
   AssignmentFilter,
   matchesAssignment,
@@ -138,6 +139,7 @@ function VideoPlayer({ path, exercise }: { path: string; exercise: Exercise }) {
 
 function App() {
   const [tab, setTab] = useState<Tab>("start");
+  const [muscleTraining, setMuscleTraining] = useState(false);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [profileId, setProfileId] = useState<number>(
     () => Number(localStorage.getItem("helden-profile")) || 0,
@@ -242,6 +244,7 @@ function App() {
   }
   function navigate(next: Tab) {
     setTab(next);
+    setMuscleTraining(false);
     setSession(null);
     setCategory("Alle");
     setAssignment("all");
@@ -298,7 +301,11 @@ function App() {
             <span className="breadcrumb">Helden-Training</span>
             <ChevronRight size={14} />
             <span>
-              {session ? "Training" : nav.find((n) => n.id === tab)?.title}
+              {session
+                ? "Training"
+                : muscleTraining
+                  ? "Training nach Muskelgruppen"
+                  : nav.find((n) => n.id === tab)?.title}
             </span>
           </div>
           <label className="profile-select">
@@ -349,6 +356,21 @@ function App() {
                 setSession(null);
                 refreshSessions(profileId).catch((e) => setError(e.message));
               }}
+            />
+          ) : muscleTraining ? (
+            <MuscleTraining
+              exercises={exercises}
+              profile={profile}
+              active={active}
+              onStarted={async (s) => {
+                if (s.profile_id === profileRef.current) setSession(s);
+                await refreshSessions(profileRef.current);
+              }}
+              onPlanSaved={refresh}
+              onPreview={setPreview}
+              onClose={() => setMuscleTraining(false)}
+              onNeedProfile={() => setProfileEditor("new")}
+              onBusyChange={setBusy}
             />
           ) : (
             <>
@@ -408,6 +430,12 @@ function App() {
                       <span className="art-label">STARK IN DEINEM TEMPO.</span>
                     </div>
                   </section>
+                  <button
+                    className="primary muscle-training-entry"
+                    onClick={() => setMuscleTraining(true)}
+                  >
+                    Training nach Muskelgruppen <ArrowRight size={17} />
+                  </button>
                   <div className="stats">
                     <Stat
                       label="Abgeschlossene Trainings"
@@ -944,7 +972,7 @@ function App() {
             </>
           )}
           <footer>
-            <Dumbbell size={14} /> HELDEN-TRAINING · 0.1.8{" "}
+            <Dumbbell size={14} /> HELDEN-TRAINING · 0.1.9{" "}
             <span>Dein Tempo. Dein Fortschritt.</span>
           </footer>
         </main>
@@ -1951,6 +1979,7 @@ function Training({
                 item={item}
                 busy={busy}
                 finished={finished}
+                useTargets={session.source === "direct"}
                 onSave={(log) =>
                   run(async () => {
                     onChange(
@@ -2110,7 +2139,9 @@ function SetRow({
   busy,
   finished,
   onSave,
+  useTargets = false,
 }: {
+  useTargets?: boolean;
   index: number;
   item: SessionItem;
   busy: boolean;
@@ -2120,9 +2151,11 @@ function SetRow({
   const saved = item.logs.find((l) => l.set_index === index);
   const previous = item.previous[index];
   const [weight, setWeight] = useState(
-    saved?.weight ?? previous?.weight ?? item.weight,
+    saved?.weight ?? (useTargets ? undefined : previous?.weight) ?? item.weight,
   );
-  const [reps, setReps] = useState(saved?.reps ?? previous?.reps ?? item.reps);
+  const [reps, setReps] = useState(
+    saved?.reps ?? (useTargets ? undefined : previous?.reps) ?? item.reps,
+  );
   const [notes, setNotes] = useState(saved?.notes || "");
   const dirty =
     !!saved &&

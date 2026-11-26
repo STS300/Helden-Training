@@ -977,3 +977,268 @@ test("STS and SAM assignments combine with library and plan filters", async ({
   await expect(filter).toHaveValue("SAM");
   await page.getByRole("button", { name: "Abbrechen", exact: true }).click();
 });
+
+test("Muscle selection starts training without a plan and respects profile targets", async ({
+  page,
+}, testInfo) => {
+  const prefix = `Muskelstart ${testInfo.project.name}`;
+  const headers = { "X-Helden-Request": "1" };
+  const create = async (path: string, data: unknown) =>
+    (await page.request.post(`/api/${path}`, { headers, data })).json();
+  const profile = await create("profiles", { name: `${prefix} A` });
+  const other = await create("profiles", { name: `${prefix} B` });
+  const press = await create("exercises", {
+    name: `${prefix} Drücken`,
+    categories: ["Push"],
+    muscles: "Brust",
+    assignment_groups: ["STS"],
+    media_path: "Beine/Kniebeuge.MOV",
+    equipment: "Hantelbank",
+  });
+  const pull = await create("exercises", {
+    name: `${prefix} Ziehen`,
+    categories: ["Pull"],
+    muscles: "Trizeps",
+    assignment_groups: ["SAM"],
+    equipment: "Kabelzug",
+  });
+  await create("exercises", {
+    name: `${prefix} Knie`,
+    categories: ["Beine"],
+    muscles: "Quadrizeps",
+    assignment_groups: ["SAM"],
+  });
+  for (const [id, weight, reps] of [
+    [profile.id, 35, 8],
+    [other.id, 55, 12],
+  ]) {
+    const previous = await create("sessions/direct", {
+      profile_id: id,
+      name: `Vorher ${id}`,
+      category: "Push",
+      items: [
+        {
+          exercise_id: press.id,
+          sets: 2,
+          reps: 10,
+          weight: 0,
+          rest_seconds: 0,
+        },
+      ],
+    });
+    await page.request.put(
+      `/api/sessions/${previous.id}/items/${previous.items[0].id}/sets/1`,
+      { headers, data: { weight, reps } },
+    );
+    await page.request.put(
+      `/api/sessions/${previous.id}/items/${previous.items[0].id}/sets/2`,
+      { headers, data: { weight: weight + 5, reps: 6 } },
+    );
+    await create(`sessions/${previous.id}/finish`, undefined);
+  }
+  const beforePlans = (await (await page.request.get("/api/plans")).json())
+    .length;
+  await page.goto("/api/hassio_ingress/test-token/");
+  await page
+    .getByRole("combobox", { name: "Aktives Trainingsprofil" })
+    .selectOption(String(profile.id));
+  await page
+    .getByRole("button", { name: "Training nach Muskelgruppen", exact: true })
+    .click();
+  await expect(
+    page.getByText("Wähle mindestens eine Muskelgruppe in der Grafik aus."),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Alle passenden auswählen" }),
+  ).toBeDisabled();
+  await page.getByLabel("Übungsname oder Gerät suchen").fill(prefix);
+  const muscles = page.getByRole("group", {
+    name: "Muskelgruppen für dein Training",
+    exact: true,
+  });
+  await muscles.getByRole("button", { name: "Brust", exact: true }).click();
+  await expect(page.locator(".direct-match")).toHaveCount(1);
+  await page
+    .getByRole("button", { name: `${press.name} Vorschau`, exact: true })
+    .click();
+  await expect(page.getByRole("dialog").locator("video")).toHaveCount(1);
+  await page.getByRole("button", { name: "Schließen", exact: true }).click();
+  await page
+    .getByRole("checkbox", {
+      name: `${press.name} für Training auswählen`,
+      exact: true,
+    })
+    .check();
+  const weight = page.getByLabel(`Gewicht (kg) ${press.name}`, { exact: true });
+  const reps = page.getByLabel(`Wiederholungen ${press.name}`, { exact: true });
+  await expect(weight).toHaveValue("35");
+  await expect(reps).toHaveValue("8");
+  await expect(
+    page.getByLabel(`Sätze ${press.name}`, { exact: true }),
+  ).toHaveValue("3");
+  await expect(
+    page.getByLabel(`Pause (Sek.) ${press.name}`, { exact: true }),
+  ).toHaveValue("90");
+  await page
+    .getByRole("combobox", { name: "Aktives Trainingsprofil" })
+    .selectOption(String(other.id));
+  await expect(weight).toHaveValue("55");
+  await expect(reps).toHaveValue("12");
+  await page
+    .getByRole("combobox", { name: "Aktives Trainingsprofil" })
+    .selectOption(String(profile.id));
+  await expect(weight).toHaveValue("35");
+  await expect(reps).toHaveValue("8");
+  await muscles.getByRole("button", { name: "Trizeps", exact: true }).click();
+  await expect(page.locator(".direct-match")).toHaveCount(2);
+  await page
+    .getByRole("combobox", { name: "STS-/SAM-Filter", exact: true })
+    .selectOption("SAM");
+  await expect(page.locator(".direct-match")).toHaveCount(1);
+  await page.getByRole("button", { name: "Alle passenden auswählen" }).click();
+  await expect(page.locator(".builder-item")).toHaveCount(2);
+  await page
+    .getByLabel("Übungsname oder Gerät suchen")
+    .fill("unbekanntes Gerät");
+  await expect(
+    page.getByText(/Keine passenden Übungen. Prüfe Suche/),
+  ).toBeVisible();
+  await expect(page.locator(".builder-item")).toHaveCount(2);
+  await page.getByLabel("Übungsname oder Gerät suchen").fill(prefix);
+  await page.getByLabel("Kategorievorlage").selectOption("Unterkörper");
+  await expect(
+    muscles.getByRole("button", { name: "Quadrizeps", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator(".direct-match")).toHaveCount(1);
+  await page
+    .getByRole("button", { name: `${pull.name} nach oben`, exact: true })
+    .click();
+  await expect(page.locator(".builder-item").first()).toContainText(pull.name);
+  await weight.fill("42,5");
+  await reps.fill("11");
+  for (const exercise of [press, pull]) {
+    await page.getByLabel(`Sätze ${exercise.name}`, { exact: true }).fill("1");
+    await page
+      .getByLabel(`Pause (Sek.) ${exercise.name}`, { exact: true })
+      .fill("0");
+  }
+  await page.getByLabel("Name des Trainings", { exact: true }).fill(prefix);
+  await page.screenshot({
+    path: `test-results/muscle-training-${testInfo.project.name}.png`,
+    fullPage: true,
+  });
+  await page
+    .getByRole("button", {
+      name: "Training mit 2 Übungen starten",
+      exact: true,
+    })
+    .click();
+  await expect(page.locator(".training-main")).toContainText(pull.name);
+  await expect(page.getByLabel("Gewicht Satz 1", { exact: true })).toHaveValue(
+    "0",
+  );
+  await page
+    .getByRole("button", { name: "Satz 1 speichern", exact: true })
+    .click();
+  await page
+    .locator(".session-outline button")
+    .filter({ hasText: press.name })
+    .click();
+  await expect(page.getByLabel("Gewicht Satz 1", { exact: true })).toHaveValue(
+    "42.5",
+  );
+  await expect(
+    page.getByLabel("Wiederholungen Satz 1", { exact: true }),
+  ).toHaveValue("11");
+  await expect(page.locator(".training-main video")).toHaveCount(1);
+  await page
+    .getByRole("button", { name: "Satz 1 speichern", exact: true })
+    .click();
+  await expect(page.locator(".set-row.saved")).toHaveCount(1);
+  await page.reload();
+  await page
+    .getByRole("button", { name: "Training nach Muskelgruppen", exact: true })
+    .click();
+  await expect(
+    page.getByRole("button", {
+      name: "Aktives Training fortsetzen",
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: /Training mit \d+ Übungen starten/ }),
+  ).toHaveCount(0);
+  await page
+    .getByRole("button", { name: "Aktives Training fortsetzen", exact: true })
+    .click();
+  await page
+    .locator(".session-outline button")
+    .filter({ hasText: press.name })
+    .click();
+  await expect(page.getByLabel("Gewicht Satz 1", { exact: true })).toHaveValue(
+    "42.5",
+  );
+  page.once("dialog", (dialog) => dialog.accept());
+  await page
+    .getByRole("button", { name: "Training abschließen", exact: true })
+    .click();
+  await expect(
+    page.getByText("Training abgeschlossen", { exact: true }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Mein Verlauf", exact: true }).click();
+  await expect(
+    page.locator(".history-entry").filter({ hasText: prefix }),
+  ).toContainText("467,5 kg Volumen");
+  expect((await (await page.request.get("/api/plans")).json()).length).toBe(
+    beforePlans,
+  );
+});
+
+test("Muscle training can optionally be saved as a reusable plan", async ({
+  page,
+}, testInfo) => {
+  const headers = { "X-Helden-Request": "1" };
+  const name = `Muskelvorlage ${testInfo.project.name}`;
+  const exercise = await (
+    await page.request.post("/api/exercises", {
+      headers,
+      data: {
+        name,
+        categories: ["Push"],
+        muscles: "Brust",
+        assignment_groups: ["STS"],
+      },
+    })
+  ).json();
+  await page.goto("/api/hassio_ingress/test-token/");
+  await page
+    .getByRole("button", { name: "Training nach Muskelgruppen", exact: true })
+    .click();
+  await page.getByLabel("Kategorievorlage").selectOption("Push");
+  await page
+    .getByRole("combobox", { name: "STS-/SAM-Filter", exact: true })
+    .selectOption("STS");
+  await page.getByLabel("Übungsname oder Gerät suchen").fill(name);
+  await page.getByRole("button", { name: "Alle passenden auswählen" }).click();
+  await page.getByLabel("Name des Trainings", { exact: true }).fill(name);
+  await page
+    .getByRole("button", { name: "Als Trainingsplan speichern", exact: true })
+    .click();
+  await expect(
+    page.getByText("Als Trainingsplan gespeichert.", { exact: true }),
+  ).toBeVisible();
+  const plans = await (await page.request.get("/api/plans")).json();
+  const plan = plans.find((p: { name: string }) => p.name === name);
+  expect(plan.assignment_filter).toBe("STS");
+  expect(plan.target_muscles).toEqual(["Brust", "Schultern", "Trizeps"]);
+  expect(plan.items[0].exercise_id).toBe(exercise.id);
+  await page
+    .getByRole("button", { name: "Zurück zur Übersicht", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Trainingspläne", exact: true })
+    .click();
+  await expect(
+    page.locator(".plan-card").filter({ hasText: name }),
+  ).toBeVisible();
+});

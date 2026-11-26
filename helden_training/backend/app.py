@@ -111,6 +111,10 @@ class StartSession(BaseModel):
     plan_id: int = Field(gt=0)
 
 
+class DirectSession(Plan):
+    profile_id: int = Field(gt=0)
+
+
 class SetLog(BaseModel):
     weight: float = Field(ge=0, le=2000)
     reps: int = Field(ge=1, le=200)
@@ -170,7 +174,8 @@ CREATE TABLE IF NOT EXISTS plan_items (
 );
 CREATE TABLE IF NOT EXISTS sessions (
  id INTEGER PRIMARY KEY, profile_id INTEGER NOT NULL REFERENCES profiles(id),
- plan_name TEXT NOT NULL, category TEXT NOT NULL, started_at TEXT NOT NULL, finished_at TEXT
+ plan_name TEXT NOT NULL, category TEXT NOT NULL, started_at TEXT NOT NULL, finished_at TEXT,
+ source TEXT NOT NULL DEFAULT 'plan'
 );
 CREATE TABLE IF NOT EXISTS id_counters (name TEXT PRIMARY KEY, value INTEGER NOT NULL);
 CREATE UNIQUE INDEX IF NOT EXISTS one_active_session ON sessions(profile_id) WHERE finished_at IS NULL;
@@ -229,14 +234,17 @@ def create_app(data_dir=None, static_dir=None, ingress_only=None, media_dir=None
                 conn.execute("ALTER TABLE plans ADD COLUMN assignment_filter TEXT NOT NULL DEFAULT 'all'")
             conn.execute("INSERT OR IGNORE INTO id_counters(name,value) SELECT 'sessions',COALESCE(MAX(id),0) FROM sessions")
             conn.execute("UPDATE id_counters SET value=MAX(value,(SELECT COALESCE(MAX(id),0) FROM sessions)) WHERE name='sessions'")
-            conn.execute('PRAGMA user_version=5')
+            session_columns = {row['name'] for row in conn.execute('PRAGMA table_info(sessions)')}
+            if 'source' not in session_columns:
+                conn.execute("ALTER TABLE sessions ADD COLUMN source TEXT NOT NULL DEFAULT 'plan'")
+            conn.execute('PRAGMA user_version=6')
         (data / 'uploads').mkdir(exist_ok=True)
         # Remove partial uploads left by a power interruption, never finished videos.
         for partial in (data / 'videos').glob('*.part'):
             partial.unlink(missing_ok=True)
         yield
 
-    app = FastAPI(title='Helden-Training', version='0.1.8', lifespan=lifespan,
+    app = FastAPI(title='Helden-Training', version='0.1.9', lifespan=lifespan,
                   docs_url=None, redoc_url=None, openapi_url=None)
 
     @app.exception_handler(RequestValidationError)
@@ -321,7 +329,7 @@ def create_app(data_dir=None, static_dir=None, ingress_only=None, media_dir=None
 
     @app.get('/api/health')
     def health():
-        return {'status': 'ok', 'version': '0.1.8'}
+        return {'status': 'ok', 'version': '0.1.9'}
 
     @app.get('/api/local-media')
     def browse_media(folder: str = ''):
@@ -537,27 +545,52 @@ def create_app(data_dir=None, static_dir=None, ingress_only=None, media_dir=None
                 FROM sessions s LEFT JOIN session_items i ON i.session_id=s.id
                 LEFT JOIN set_logs l ON l.item_id=i.id WHERE s.profile_id=? GROUP BY s.id ORDER BY julianday(s.started_at) DESC, s.id DESC''', (profile_id,))]
 
+    @app.get('/api/profiles/{identifier}/exercise-suggestions')
+    def exercise_suggestions(identifier: int):
+        with db() as conn:
+            get(conn, 'profiles', identifier, True)
+            rows = conn.execute('''SELECT i.exercise_id,l.weight,l.reps,s.plan_name,s.id AS session_id
+                FROM set_logs l JOIN session_items i ON i.id=l.item_id JOIN sessions s ON s.id=i.session_id
+                WHERE s.profile_id=? AND s.finished_at IS NOT NULL
+                ORDER BY julianday(s.started_at) DESC,s.id DESC,l.set_index ASC''', (identifier,)).fetchall()
+            suggestions = {}
+            for row in rows:
+                suggestions.setdefault(str(row['exercise_id']), {'weight': row['weight'], 'reps': row['reps'],
+                    'session_name': row['plan_name'], 'session_id': row['session_id']})
+            return suggestions
+
+    def create_training(conn, profile_id, name, category, items, source='plan'):
+        get(conn, 'profiles', profile_id, True)
+        if not name.strip() or category not in CATEGORIES or not 1 <= len(items) <= 60:
+            raise HTTPException(422, 'Name, Kategorie oder Übungsauswahl ungültig.')
+        if conn.execute('SELECT id FROM sessions WHERE profile_id=? AND finished_at IS NULL', (profile_id,)).fetchone():
+            raise HTTPException(409, 'Dieses Profil hat bereits ein aktives Training. Bitte fortsetzen.')
+        # Never reuse deleted session IDs: stale open tabs must not edit a newer training.
+        identifier = conn.execute("UPDATE id_counters SET value=value+1 WHERE name='sessions' RETURNING value").fetchone()['value']
+        conn.execute('INSERT INTO sessions(id,profile_id,plan_name,category,started_at,source) VALUES (?,?,?,?,?,?)',
+                     (identifier, profile_id, name.strip(), category, now(), source))
+        for position, item in enumerate(items):
+            exercise = get(conn, 'exercises', item['exercise_id'], True)
+            exercise['categories'] = json.loads(exercise['categories'])
+            exercise['assignment_groups'] = json.loads(exercise['assignment_groups'])
+            conn.execute('''INSERT INTO session_items(session_id,exercise_id,position,snapshot,sets,reps,rest_seconds,weight)
+                VALUES (?,?,?,?,?,?,?,?)''', (identifier, exercise['id'], position, json.dumps(exercise), item['sets'], item['reps'], item['rest_seconds'], item['weight']))
+        return session_detail(conn, identifier)
+
     @app.post('/api/sessions', status_code=201)
     def start_session(body: StartSession):
         with db() as conn:
             conn.execute('BEGIN IMMEDIATE')
-            get(conn, 'profiles', body.profile_id, True)
             plan = get(conn, 'plans', body.plan_id, True)
-            if conn.execute('SELECT id FROM sessions WHERE profile_id=? AND finished_at IS NULL', (body.profile_id,)).fetchone():
-                raise HTTPException(409, 'Dieses Profil hat bereits ein aktives Training. Bitte fortsetzen.')
-            items = conn.execute('SELECT * FROM plan_items WHERE plan_id=? ORDER BY position', (body.plan_id,)).fetchall()
-            if not items:
-                raise HTTPException(422, 'Der Plan enthält keine Übungen.')
-            # Never reuse deleted session IDs: stale open tabs must not edit a newer training.
-            identifier = conn.execute("UPDATE id_counters SET value=value+1 WHERE name='sessions' RETURNING value").fetchone()['value']
-            conn.execute('INSERT INTO sessions(id,profile_id,plan_name,category,started_at) VALUES (?,?,?,?,?)',
-                         (identifier, body.profile_id, plan['name'], plan['category'], now()))
-            for item in items:
-                exercise = get(conn, 'exercises', item['exercise_id'], True)
-                exercise['categories'] = json.loads(exercise['categories'])
-                conn.execute('''INSERT INTO session_items(session_id,exercise_id,position,snapshot,sets,reps,rest_seconds,weight)
-                    VALUES (?,?,?,?,?,?,?,?)''', (identifier, exercise['id'], item['position'], json.dumps(exercise), item['sets'], item['reps'], item['rest_seconds'], item['weight']))
-            return session_detail(conn, identifier)
+            items = [dict(row) for row in conn.execute('SELECT * FROM plan_items WHERE plan_id=? ORDER BY position', (body.plan_id,))]
+            return create_training(conn, body.profile_id, plan['name'], plan['category'], items)
+
+    @app.post('/api/sessions/direct', status_code=201)
+    def start_direct_training(body: DirectSession):
+        with db() as conn:
+            conn.execute('BEGIN IMMEDIATE')
+            return create_training(conn, body.profile_id, body.name, body.category,
+                                   [item.model_dump() for item in body.items], source='direct')
 
     @app.get('/api/sessions/{identifier}')
     def read_session(identifier: int):

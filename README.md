@@ -12,6 +12,7 @@ Eine lokale Krafttrainings-App für **Home Assistant OS**. Eigene Übungsvideos,
 - Kachel- oder Listenansicht, Kategorievorlagen für Muskelgruppen und mit dem Plan gespeicherte Muskelauswahl.
 - Trainings im Verlauf korrigieren oder nach Bestätigung löschen.
 - STS-/SAM-Zuordnung je Übung und kombinierbare Filter in Bibliothek und Planeditor; Filterauswahl wird mit dem Plan gespeichert.
+- Direkt nach Muskelgruppen trainieren: Körpergrafik, passende Übungen, persönliche Vorgaben und Start ohne gespeicherten Plan; Zusammenstellung optional als Plan sichern.
 - Profile anlegen, umbenennen, farblich kennzeichnen und archivieren.
 - OneDrive-Freigabelink je Übung speichern und das Video in einem neuen Tab aus Bibliothek oder Training öffnen; kein Video-Upload erforderlich.
 - Eigene MP4- und MOV-Videos in kleinen bestätigten Blöcken hochladen, ersetzen und mit Start-/Endzeit versehen. Unterbrochene Blöcke werden wiederholt; ein erneuter Versuch im selben Dialog setzt bestätigte Teile fort.

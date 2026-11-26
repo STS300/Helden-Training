@@ -10,6 +10,24 @@
 
 Die letzte Eingabe desselben Profils und derselben Übung aus abgeschlossenen Einheiten wird als Ausgangswert vorgeschlagen. Null kg steht beispielsweise für eine Übung mit dem eigenen Körpergewicht; das Körpergewicht wird nicht zum Volumen addiert.
 
+## Training direkt nach Muskelgruppen (ab 0.1.9)
+
+Auf der Startseite **Training nach Muskelgruppen** öffnen. Auf der Vorder-/Rückansicht oder mit den beschrifteten Schaltflächen mindestens eine Muskelgruppe auswählen. Ohne Muskelauswahl werden keine Übungen angeboten. Darunter erscheinen Übungen mit mindestens einer passenden Muskelzuordnung; Übungen ohne zugewiesene Muskelgruppen erscheinen nicht.
+
+Optional eine **Kategorievorlage** wählen und die markierten Gruppen individuell anpassen. Der **STS-/SAM-Filter** sowie die Suche nach Übungsname oder Gerät grenzen die Treffer weiter ein. Ein Filterwechsel verändert keine bereits ausgewählte Übung. Videos sind über die Vorschau erreichbar.
+
+Die Treffer sind zunächst nicht ausgewählt. Mit **Für Training auswählen** einzelne Übungen oder mit **Alle passenden auswählen** alle angezeigten Treffer hinzufügen. Höchstens 60 Übungen je Training. Unter **Dein Training** Reihenfolge ändern, Übungen entfernen und Satzvorgaben bearbeiten. Standard: 3 Sätze, 10 Wiederholungen, 0 kg und 90 Sekunden Pause.
+
+Für das oben gewählte Profil werden Gewicht und Wiederholungen aus dem ersten gespeicherten Satz des letzten abgeschlossenen Trainings je Übung vorgeschlagen. Aktive Trainings werden dafür nicht verwendet. Bei einem Profilwechsel bleiben die gewählten Übungen erhalten; Gewichte und Wiederholungen werden für das neue Profil neu vorgeschlagen. Ohne frühere Werte gelten 0 kg und 10 Wiederholungen. Während des Ladens der Vorschläge kurz warten; bei einem Ladefehler Vorgaben manuell prüfen.
+
+Die vor dem Direktstart angezeigten bzw. manuell geänderten Werte gelten für alle Sätze der jeweiligen Übung. Unterschiedliche Gewichte pro Satz können anschließend in der Trainingsansicht eingegeben werden. Die übliche planbasierte Vorschlagsfunktion bleibt unverändert.
+
+**Training mit … Übungen starten** öffnet die gewohnte Trainingsansicht mit Video, Satzspeicherung und Pausentimer. Es wird kein Plan benötigt oder automatisch angelegt. Das Training erscheint regulär im Verlauf, kann nach Unterbrechung fortgesetzt und später bearbeitet oder gelöscht werden. Läuft für das Profil bereits ein Training, wird stattdessen **Aktives Training fortsetzen** angeboten. Ohne Profil zuerst **Profil anlegen** wählen.
+
+Mit **Als Trainingsplan speichern** kann die aktuelle Zusammenstellung zusätzlich als wiederverwendbarer Plan gespeichert werden. Muskelauswahl, Kategorie und STS-/SAM-Filter werden dabei übernommen. Das Speichern allein startet kein Training. Bei der Auswahl ohne Kategorievorlage wird Ganzer Körper als Kategorie verwendet; die individuell gewählten Muskeln bleiben beim optional gespeicherten Plan erhalten.
+
+Vor dem Start ist die Zusammenstellung nur in der geöffneten Ansicht vorhanden und geht beim Neuladen oder Verlassen verloren. Bereits gestartete Einheiten und gespeicherte Pläne bleiben erhalten. Trainingsname und persönliche Gewichte können wie bisher über Verlauf und Profile verwaltet werden.
+
 ## STS und SAM zuordnen und filtern (ab 0.1.8)
 
 Im Übungseditor unter **STS-/SAM-Zuordnung** STS, SAM, beide oder keine Gruppe auswählen und die Übung speichern. Die Zuordnung ist unabhängig von Trainingskategorien, Muskelgruppen und Trainingsprofilen. In Kachel- und Listenansicht erscheinen die ausgewählten Gruppen als Kennzeichnungen.

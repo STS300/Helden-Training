@@ -1832,3 +1832,103 @@ video {
 .filters .assignment-filter {
   margin: 0;
 }
+.muscle-training-entry {
+  margin: 20px 0;
+}
+.muscle-training > section {
+  margin-top: 28px;
+}
+.direct-filters {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+.direct-filters label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  margin: 0;
+}
+.direct-filters input,
+.direct-filters select {
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: white;
+  color: inherit;
+}
+.direct-matches {
+  display: grid;
+  gap: 12px;
+}
+.direct-match {
+  display: grid;
+  grid-template-columns: 140px minmax(0, 1fr);
+}
+.direct-match > div {
+  padding: 16px;
+}
+.direct-match h3 {
+  margin: 0 0 8px;
+}
+.direct-match .video-cover {
+  height: 100%;
+  min-height: 150px;
+}
+.direct-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+}
+.direct-check input {
+  width: 20px;
+  height: 20px;
+}
+.direct-targets {
+  margin: 18px 0;
+  padding: 16px;
+  min-width: 0;
+}
+.direct-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 18px;
+}
+@media (max-width: 650px) {
+  .direct-filters {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .direct-match {
+    grid-template-columns: 90px minmax(0, 1fr);
+  }
+  .direct-match > div {
+    padding: 12px;
+  }
+  .muscle-training .section-heading {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .direct-targets .builder-heading {
+    flex-wrap: wrap;
+  }
+}
+.direct-filters select {
+  height: 44px;
+}
+.direct-targets .builder-heading > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.direct-targets .builder-heading button {
+  min-height: 40px;
+  min-width: 40px;
+  padding: 6px;
+}

@@ -59,6 +59,7 @@ export interface SessionItem extends PlanItem {
   previous: Record<string, Log>;
 }
 export interface SessionSummary {
+  source?: "plan" | "direct";
   id: number;
   profile_id: number;
   plan_name: string;
