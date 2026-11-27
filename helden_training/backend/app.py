@@ -244,7 +244,7 @@ def create_app(data_dir=None, static_dir=None, ingress_only=None, media_dir=None
             partial.unlink(missing_ok=True)
         yield
 
-    app = FastAPI(title='Helden-Training', version='0.1.9', lifespan=lifespan,
+    app = FastAPI(title='Helden-Training', version='1.0.0', lifespan=lifespan,
                   docs_url=None, redoc_url=None, openapi_url=None)
 
     @app.exception_handler(RequestValidationError)
@@ -329,7 +329,7 @@ def create_app(data_dir=None, static_dir=None, ingress_only=None, media_dir=None
 
     @app.get('/api/health')
     def health():
-        return {'status': 'ok', 'version': '0.1.9'}
+        return {'status': 'ok', 'version': '1.0.0'}
 
     @app.get('/api/local-media')
     def browse_media(folder: str = ''):

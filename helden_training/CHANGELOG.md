@@ -1,3 +1,8 @@
+# 1.0.0
+
+- Aktuellen Funktionsstand als Version 1.0.0 kennzeichnen.
+- Versionsangaben der Home-Assistant-App, API und Oberfläche vereinheitlichen.
+
 # 0.1.9
 
 - Neuer Startseiten-Einstieg „Training nach Muskelgruppen“ mit Körpergrafik, optionalen Kategorievorlagen, STS-/SAM-Filter und Suche.

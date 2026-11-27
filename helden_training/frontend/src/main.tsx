@@ -972,7 +972,7 @@ function App() {
             </>
           )}
           <footer>
-            <Dumbbell size={14} /> HELDEN-TRAINING · 0.1.9{" "}
+            <Dumbbell size={14} /> HELDEN-TRAINING · 1.0.0{" "}
             <span>Dein Tempo. Dein Fortschritt.</span>
           </footer>
         </main>
